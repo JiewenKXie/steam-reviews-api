@@ -47,3 +47,10 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+.idea/workspace.xml
+.idea/scopes/scope_settings.xml
+.idea/encodings.xml
+.idea/steam_reviews_api.iml
+.idea/modules.xml
+.idea/.name
+.idea/vcs.xml

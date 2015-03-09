@@ -720,7 +720,6 @@ class Core extends Config
         else
         {
 
-            $config = $this->get_config();
             $resource_stats = array();
 
             $link_segments = explode('/', $link);
@@ -740,37 +739,8 @@ class Core extends Config
             elseif($link_segments[3] == 'id' || $link_segments[3] == 'profiles')
             {
 
-                $resource_stats['type'] = 'steam_profile';
-                $resource_stats['link'] = $link;
-
-
-                if($link_segments[3] == 'id')
-                {
-
-                    $id_name = $link_segments[4];
-
-                    $try_get_user_id = $this->try_get_url_content("http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=" . $config['steam_web_api_key'] . "&vanityurl=" . $id_name, 3);
-                    $try_get_user_id = json_decode($try_get_user_id);
-
-                    if(isset($try_get_user_id->response->success) && $try_get_user_id->response->success == 1)
-                        $steam_id = $try_get_user_id->response->steamid;
-                    else
-                        $steam_id = false;
-
-                }
-                elseif($link_segments[3] == 'profiles')
-                {
-                    $steam_id = $link_segments[4];
-                }
-
-                if($steam_id !== false)
-                {
-                    $try_get_user_info = $this->try_get_url_content("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=" . $config['steam_web_api_key'] . "&steamids=" . $steam_id . "&format=json", 3);
-                }
-                else
-                {
-                    //сконфигурировать профиль из url
-                }
+                $steam_users = New SteamUserInfo();
+                $resource_stats = $steam_users->get_user_info_by_url($link);
 
 
             }
@@ -781,6 +751,52 @@ class Core extends Config
 
     }
 
+
+
+
+}
+
+class SteamUserInfo extends Core
+{
+
+    public function get_user_info_by_url($link)
+    {
+
+        $config = $this->get_config();
+        $link_segments = explode('/', $link);
+
+        $resource_stats['type'] = 'steam_profile';
+        $resource_stats['link'] = $link;
+
+
+        if($link_segments[3] == 'id')
+        {
+
+            $id_name = $link_segments[4];
+
+            $try_get_user_id = $this->try_get_url_content("http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=" . $config['steam_web_api_key'] . "&vanityurl=" . $id_name, 3);
+            $try_get_user_id = json_decode($try_get_user_id);
+
+            if(isset($try_get_user_id->response->success) && $try_get_user_id->response->success == 1)
+                $steam_id = $try_get_user_id->response->steamid;
+            else
+                $steam_id = false;
+
+        }
+        elseif($link_segments[3] == 'profiles')
+        {
+            $steam_id = $link_segments[4];
+        }
+
+        if($steam_id !== false)
+        {
+            $try_get_user_info = $this->try_get_url_content("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=" . $config['steam_web_api_key'] . "&steamids=" . $steam_id . "&format=json", 3);
+        }
+        else
+        {
+            //сконфигурировать профиль из url
+        }
+    }
 
     private function try_get_url_content($url, $try_count)
     {
@@ -802,5 +818,6 @@ class Core extends Config
             return $try_get_content;
 
     }
+
 
 }
