@@ -40,7 +40,9 @@ class Config
                 '460_215' => 'header.jpg'
             ),
 
-            'steam_web_api_key' => 'FD6C42779FD77C760DAC94628A60EB6B'
+            'steam_web_api_key' => 'FD6C42779FD77C760DAC94628A60EB6B',
+
+            'cron_access_ip' => array('127.0.0.1')
 
         );
 

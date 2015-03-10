@@ -322,7 +322,6 @@ class Core extends Config
 
                         $dirty_text = str_replace($resource_html, '[resource_' . $resource_counter . ']', $dirty_text);
 
-
                     }
 
                 }
@@ -443,8 +442,6 @@ class Core extends Config
 
     }
 
-
-
     public function get_search_query_validate()
     {
 
@@ -484,8 +481,6 @@ class Core extends Config
         }
 
     }
-
-
 
     public function get_search()
     {
@@ -545,7 +540,6 @@ class Core extends Config
 
     }
 
-
     public function cache_search_app_items($array)
     {
 
@@ -589,8 +583,6 @@ class Core extends Config
         $this->mysql_connect->query("INSERT INTO `apps_list` (`app_id`, `name`) VALUES " . $insert_values_string . ";");
 
     }
-
-
 
     public function get_search_result_from_steam()
     {
@@ -683,9 +675,6 @@ class Core extends Config
         }
 
     }
-
-
-
 
 }
 
@@ -842,7 +831,5 @@ class SteamUserInfo extends Core
         return $resource_stats;
 
     }
-
-
 
 }

@@ -1,5 +1,6 @@
 <?php
 
+
 /* get user_id by user_name
 
 $try_get_user_id = $this->try_get_url_content("http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=" . $config['steam_web_api_key'] . "&vanityurl=" . $id_name, 3);
@@ -17,26 +18,60 @@ $try_get_user_info = $this->try_get_url_content("http://api.steampowered.com/ISt
 
 return $try_get_user_info;
 
+*/
 
-/* retrying get function
+require('/config.php');
+require('/core.php');
 
-private function try_get_url_content($url, $try_count)
+class Cron extends Core
 {
 
-    $try_get_content = @file_get_contents($url);
-
-    if($try_get_content == false)
+    public function start()
     {
 
-        $try_count = $try_count - 1;
+        $this->do_mysql_connect();
 
-        if($try_count < 0)
-            return false;
-        else
-            return $this->try_get_url_content($url, $try_count);
+        $this->collection_data_users();
 
     }
-    else
-        return $try_get_content;
+
+    private function collection_data_users()
+    {
+
+
+
+    }
+
+    private function try_get_url_content($url, $try_count)
+    {
+
+        $try_get_content = @file_get_contents($url);
+
+        if($try_get_content == false)
+        {
+
+            --$try_count;
+
+            if($try_count < 0)
+                return false;
+            else
+                return $this->try_get_url_content($url, $try_count);
+
+        }
+        else
+            return $try_get_content;
+
+    }
+
+}
+
+$ip = $_SERVER['REMOTE_ADDR'];
+$config = Config::get_config();
+
+if(in_array($ip, $config['cron_access_ip']))
+{
+
+    $cron = new Cron;
+    $cron->start();
 
 }
