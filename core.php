@@ -12,7 +12,7 @@ function overdie($array)
 
 }
 
-function RecalculateDate($date, $rec)
+function recalculate_date($date, $rec)
 {
 
     return date('Y-m-d H:i:s', strtotime($rec, strtotime($date)));
@@ -88,7 +88,7 @@ class Core extends Config
         }
 
         //if it exists, but expired
-        elseif($result['datetime'] < RecalculateDate(date('Y-m-d H:i:s'), '-' . $config['request_limit_time_in_minutes'] . ' minutes'))
+        elseif($result['datetime'] < recalculate_date(date('Y-m-d H:i:s'), '-' . $config['request_limit_time_in_minutes'] . ' minutes'))
         {
 
             $this->mysql_connect->query("DELETE FROM `request_limit` WHERE `ip` = '" . $ip . "'");
@@ -104,7 +104,7 @@ class Core extends Config
             $count++;
 
             if($count >= $config['count_request_limit'])
-                die('Exceeded the query limit. The limit is reset at ' . RecalculateDate($result['datetime'], '+' . $config['request_limit_time_in_minutes'] . ' minutes'));
+                die('Exceeded the query limit. The limit is reset at ' . recalculate_date($result['datetime'], '+' . $config['request_limit_time_in_minutes'] . ' minutes'));
 
             $this->mysql_connect->query("UPDATE `request_limit` SET `count` = " . $count . " WHERE `id` = " . $result['id']);
 
@@ -163,7 +163,7 @@ class Core extends Config
         }
 
         //if it exists, but expired
-        elseif(date('Y-m-d H:i:s') > RecalculateDate($result['datetime'], '+' . $config['reviews_cache_time'] . ' minutes'))
+        elseif(date('Y-m-d H:i:s') > recalculate_date($result['datetime'], '+' . $config['reviews_cache_time'] . ' minutes'))
         {
 
             $items = $this->get_reviews_from_steam();
@@ -194,26 +194,11 @@ class Core extends Config
 
     public function get_reviews_from_steam()
     {
-
         $config = $this->get_config();
+        $UrlContent = new UrlContent();
 
-        $fake_browser_data = array(
-
-            'http'=>array(
-                'method' => "GET",
-                'User-Agent' => $config['fake_user_agent'],
-                'header' => "Accept-language: " . $config['language_header_components'][$_GET['language']]['header'] . "\r\n" .
-                            "Cookie: Steam_Language=" . $config['language_header_components'][$_GET['language']]['cookie'] . "\r\n"
-            )
-
-        );
-
-        $context = stream_context_create($fake_browser_data);
         $url = 'http://store.steampowered.com/appreviews/' . $_GET['app'] . '?start_offset=' . $_GET['offset'] . '&day_range=' . $_GET['day_range'] . '&filter=' . $_GET['filter'] . '&language=' . $_GET['language'];
-        $uconfig = @fopen($url, 'r', false, $context);
-        $steam_json = @stream_get_contents($uconfig);
-
-        $steam_json = json_decode($steam_json);
+        $steam_json = json_decode($UrlContent->try_get_url_content($url));
 
         if($steam_json->success !== 1)
             die('App not found');
@@ -385,62 +370,8 @@ class Core extends Config
 
     }
 
-    public function render_serialize($items)
-    {
-
-        echo serialize($items);
-
-    }
-
-    public function render_json($items)
-    {
-
-        echo json_encode($items);
-
-    }
-
-    public function render_xml($items, $item_name = 'review')
-    {
-
-        $xml = new SimpleXMLElement('<xml/>');
-
-        foreach($items as $item)
-        {
-
-            $track = $xml->addChild($item_name);
-
-            foreach($item as $key => $value)
-                $this->loop_generate_xml($track, $key, $value);
-
-        }
-
-        Header('Content-type: text/xml');
-        echo $xml->asXML();
 
 
-    }
-
-    private function loop_generate_xml($xml, $name, $array)
-    {
-
-        /* shit function */
-
-        if(is_array($array))
-            $current_condition = $xml->addChild($name, '');
-        else
-            $current_condition = $xml;
-
-        if(is_array($array))
-        {
-            foreach($array as $key => $value)
-                $result = $this->loop_generate_xml($current_condition, $key, $value);
-        }
-        else
-            $result = $current_condition->addChild($name, $array);
-
-        return $result;
-
-    }
 
     public function get_search_query_validate()
     {
@@ -458,6 +389,8 @@ class Core extends Config
     public function render($items, $item_name = 'review')
     {
 
+        $Render = new Render();
+
         if(isset($_GET['result']) && in_array($_GET['result'], array('xml', 'json', 'serialize')))
             $render_type = $_GET['result'];
         else
@@ -467,15 +400,15 @@ class Core extends Config
         {
 
             case 'xml':
-                $this->render_xml($items, $item_name);
+                $Render->render_xml($items, $item_name);
                 break;
 
             case 'json':
-                $this->render_json($items);
+                $Render->render_json($items);
                 break;
 
             case 'serialize':
-                $this->render_serialize($items);
+                $Render->render_serialize($items);
                 break;
 
         }
@@ -509,7 +442,7 @@ class Core extends Config
         }
 
         //if it exists, but expired
-        elseif(date('Y-m-d H:i:s') > RecalculateDate($result['datetime'], '+' . $config['search_cache_time'] . ' minutes'))
+        elseif(date('Y-m-d H:i:s') > recalculate_date($result['datetime'], '+' . $config['search_cache_time'] . ' minutes'))
         {
 
             $items = $this->get_search_result_from_steam();
@@ -588,21 +521,10 @@ class Core extends Config
     {
 
         $config = $this->get_config();
+        $UrlContent = new UrlContent();
 
-        $fake_browser_data = array(
-
-            'http'=>array(
-                'method' => "GET",
-                'User-Agent' => $config['fake_user_agent'],
-                'header' => "Accept-language: " . $config['language_header_components'][$_GET['language']]['header'] . "\r\n" .
-                    "Cookie: Steam_Language=" . $config['language_header_components'][$_GET['language']]['cookie'] . "\r\n"
-            )
-
-        );
-
-        $context = stream_context_create($fake_browser_data);
-        $uconfig = @fopen('http://store.steampowered.com/search/suggest?term=' . urlencode($_GET['term']) . '&f=games&cc=' . mb_strtoupper($config['language_header_components'][$_GET['language']]['header']) . '&l=' . $config['language_header_components'][$_GET['language']]['cookie'], 'r', false, $context);
-        $steam_html = @stream_get_contents($uconfig);
+        $url = 'http://store.steampowered.com/search/suggest?term=' . urlencode($_GET['term']) . '&f=games&cc=' . mb_strtoupper($config['language_header_components'][$_GET['language']]['header']) . '&l=' . $config['language_header_components'][$_GET['language']]['cookie'];
+        $steam_html = $UrlContent->try_get_url_content($url);
 
         return $this->detect_search_result_in_html($steam_html);
 
@@ -829,6 +751,124 @@ class SteamUserInfo extends Core
         }
 
         return $resource_stats;
+
+    }
+
+}
+
+class Render extends Core
+{
+
+
+    public function render_serialize($items)
+    {
+
+        echo serialize($items);
+
+    }
+
+    public function render_json($items)
+    {
+
+        echo json_encode($items);
+
+    }
+
+    public function render_xml($items, $item_name = 'review')
+    {
+
+        $xml = new SimpleXMLElement('<xml/>');
+
+        foreach($items as $item)
+        {
+
+            $track = $xml->addChild($item_name);
+
+            foreach($item as $key => $value)
+                $this->loop_generate_xml($track, $key, $value);
+
+        }
+
+        Header('Content-type: text/xml');
+        echo $xml->asXML();
+
+
+    }
+
+    private function loop_generate_xml($xml, $name, $array)
+    {
+
+        /* shit function */
+
+        if(is_array($array))
+            $current_condition = $xml->addChild($name, '');
+        else
+            $current_condition = $xml;
+
+        if(is_array($array))
+        {
+            foreach($array as $key => $value)
+                $result = $this->loop_generate_xml($current_condition, $key, $value);
+        }
+        else
+            $result = $current_condition->addChild($name, $array);
+
+        return $result;
+
+    }
+
+}
+
+class UrlContent extends Core
+{
+
+    public function get_url_content($get_url)
+    {
+
+        $config = $this->get_config();
+
+        $fake_browser_data = array(
+
+            'http'=>array(
+                'method' => "GET",
+                'User-Agent' => $config['fake_user_agent'],
+                'header' => "Accept-language: " . $config['language_header_components'][$_GET['language']]['header'] . "\r\n" .
+                    "Cookie: Steam_Language=" . $config['language_header_components'][$_GET['language']]['cookie'] . "\r\n"
+            )
+
+        );
+
+        $context = stream_context_create($fake_browser_data);
+        $uconfig = @fopen($get_url, 'r', false, $context);
+        $steam_html = @stream_get_contents($uconfig);
+
+        return $steam_html;
+
+    }
+
+    public function try_get_url_content($url, $try_count = false)
+    {
+
+        $config = $this->get_config();
+
+        if($try_count == false)
+            $try_count = $config['retrying_get_content'];
+
+        $try_get_content = @$this->get_url_content($url);
+
+        if($try_get_content == false)
+        {
+
+            --$try_count;
+
+            if($try_count < 0)
+                return false;
+            else
+                return $this->try_get_url_content($url, $try_count);
+
+        }
+        else
+            return $try_get_content;
 
     }
 

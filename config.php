@@ -21,6 +21,8 @@ class Config
             'count_request_limit' => 30,
             'request_limit_time_in_minutes' => 1,
 
+            'retrying_get_content' => 3,
+
             'languages' => array('russian', 'english', 'polish'),
 
             'fake_user_agent' => 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/40.0.2214.115 Safari/537.36',
