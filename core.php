@@ -323,7 +323,6 @@ class Core extends Config
                         $dirty_text = str_replace($resource_html, '[resource_' . $resource_counter . ']', $dirty_text);
 
 
-
                     }
 
                 }
@@ -646,9 +645,58 @@ class Core extends Config
         if(substr_count($link, 'youtube') > 0)
         {
 
-            $resource_stats = array('type' => 'youtube', 'link' => $link);
+            $resource_stats = YouTubeInfo::get_youtube_info($link);
 
-            $video_ID = preg_replace('~
+            return $resource_stats;
+        }
+        else
+        {
+
+            $resource_stats = array();
+            $link_segments = explode('/', $link);
+
+            /* Detect shared steam resources */
+            if($link_segments[3] == 'sharedfiles')
+            {
+
+                $resource_stats['type'] = 'steam_file';
+                $resource_stats['link'] = $link;
+
+            }
+
+            /* Detect steam profiles link */
+            elseif($link_segments[3] == 'id' || $link_segments[3] == 'profiles')
+            {
+
+                $resource_stats = SteamUserInfo::get_user_info_by_url($link);
+
+            }
+
+            else
+            {
+                $resource_stats['type'] = 'undefined';
+                $resource_stats['link'] = $link;
+            }
+
+            return $resource_stats;
+
+        }
+
+    }
+
+
+
+
+}
+
+class YouTubeInfo extends Core
+{
+
+    public function get_youtube_info($link)
+    {
+        $resource_stats = array('type' => 'youtube', 'link' => $link);
+
+        $video_ID = preg_replace('~
             # Match non-linked youtube URL in the wild. (Rev:20130823)
             https?://         # Required scheme. Either http or https.
             (?:[0-9A-Z-]+\.)? # Optional subdomain.
@@ -671,88 +719,52 @@ class Core extends Config
             )                 # End negative lookahead assertion.
             [?=&+%\w.-]*      # Consume any URL (query) remainder.
             ~ix',
-                '$1',
-                $link);
+            '$1',
+            $link);
 
 
-            $try_cache = $this->mysql_connect->query("SELECT `items` FROM (`youtube_cache`) WHERE `link` = '" . $video_ID . "'");
+        $try_cache = $this->mysql_connect->query("SELECT `items` FROM (`youtube_cache`) WHERE `link` = '" . $video_ID . "'");
 
-            if(mysqli_num_rows($try_cache) == 0)
+        if(mysqli_num_rows($try_cache) == 0)
+        {
+
+            $JSON = @file_get_contents("https://gdata.youtube.com/feeds/api/videos/{$video_ID}?v=2&alt=json");
+
+            if($JSON === FALSE)
             {
 
-                $JSON = @file_get_contents("https://gdata.youtube.com/feeds/api/videos/{$video_ID}?v=2&alt=json");
-
-                if($JSON === FALSE)
-                {
-
-                    $resource_stats['error'] = 'Wrong video id';
-
-                }
-                else
-                {
-
-                    $JSON_Data = json_decode($JSON);
-
-                    $resource_stats['views'] = $JSON_Data->{'entry'}->{'yt$statistics'}->{'viewCount'};
-                    $resource_stats['author'] = $JSON_Data->{'entry'}->{'author'}[0]->name->{'$t'};
-                    $resource_stats['title'] = $JSON_Data->{'entry'}->{'title'}->{'$t'};
-                    $resource_stats['thumbnail'] = 'http://img.youtube.com/vi/' . $video_ID . '/default.jpg';
-                    //$resource_stats['description'] = $JSON_Data->{'entry'}->{'media$group'}->{'media$description'}->{'$t'};
-                    $resource_stats['time'] = gmdate("H:i:s", (int)$JSON_Data->{'entry'}->{'media$group'}->{'media$content'}[0]->duration);
-
-                    $this->mysql_connect->query("INSERT INTO `youtube_cache` (`link`, `items`, `datetime`) VALUES ('" . $video_ID . "', '" . base64_encode(serialize($resource_stats)) . "', '" . date('Y-m-d H:i:s') . "');");
-
-                }
-
+                $resource_stats['error'] = 'Wrong video id';
 
             }
             else
             {
 
-                $query = $try_cache->fetch_assoc();
-                $resource_stats = unserialize(base64_decode($query['items']));
+                $JSON_Data = json_decode($JSON);
+
+                $resource_stats['views'] = $JSON_Data->{'entry'}->{'yt$statistics'}->{'viewCount'};
+                $resource_stats['author'] = $JSON_Data->{'entry'}->{'author'}[0]->name->{'$t'};
+                $resource_stats['title'] = $JSON_Data->{'entry'}->{'title'}->{'$t'};
+                $resource_stats['thumbnail'] = 'http://img.youtube.com/vi/' . $video_ID . '/default.jpg';
+                //$resource_stats['description'] = $JSON_Data->{'entry'}->{'media$group'}->{'media$description'}->{'$t'};
+                $resource_stats['time'] = gmdate("H:i:s", (int)$JSON_Data->{'entry'}->{'media$group'}->{'media$content'}[0]->duration);
+
+                $this->mysql_connect->query("INSERT INTO `youtube_cache` (`link`, `items`, `datetime`) VALUES ('" . $video_ID . "', '" . base64_encode(serialize($resource_stats)) . "', '" . date('Y-m-d H:i:s') . "');");
 
             }
 
-            return $resource_stats;
 
         }
         else
         {
 
-            $resource_stats = array();
-
-            $link_segments = explode('/', $link);
-
-            /* Detect shared steam resources */
-            if($link_segments[3] == 'sharedfiles')
-            {
-
-                $resource_stats['type'] = 'steam_file';
-                $resource_stats['link'] = $link;
-
-
-
-            }
-
-            /* Detect steam profiles link */
-            elseif($link_segments[3] == 'id' || $link_segments[3] == 'profiles')
-            {
-
-                $steam_users = New SteamUserInfo();
-                $resource_stats = $steam_users->get_user_info_by_url($link);
-
-
-            }
-
-            return $resource_stats;
+            $query = $try_cache->fetch_assoc();
+            $resource_stats = unserialize(base64_decode($query['items']));
 
         }
 
+        return $resource_stats;
+
     }
-
-
-
 
 }
 
@@ -762,62 +774,75 @@ class SteamUserInfo extends Core
     public function get_user_info_by_url($link)
     {
 
-        $config = $this->get_config();
+        $resource_stats = array();
+
         $link_segments = explode('/', $link);
 
         $resource_stats['type'] = 'steam_profile';
         $resource_stats['link'] = $link;
 
+        $try_cache = $this->mysql_connect->query("SELECT `link`, `profile_id`, `profile_name`, `real_name`, `avatar`, `lang`, `filled` FROM (`users_cache`) WHERE `link` = '" . $link . "'");
 
         if($link_segments[3] == 'id')
         {
 
-            $id_name = $link_segments[4];
+            $resource_stats['title_type'] = 'profile_name';
+            $resource_stats['profile_name'] = $link_segments[4];
 
-            $try_get_user_id = $this->try_get_url_content("http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=" . $config['steam_web_api_key'] . "&vanityurl=" . $id_name, 3);
-            $try_get_user_id = json_decode($try_get_user_id);
-
-            if(isset($try_get_user_id->response->success) && $try_get_user_id->response->success == 1)
-                $steam_id = $try_get_user_id->response->steamid;
+            if(mysqli_num_rows($try_cache) == 0)
+                $this->mysql_connect->query("INSERT INTO `users_cache` (`link`, `profile_name`, `filled`) VALUES ('" . $link. "', '" . $link_segments[4] . "', 0);");
             else
-                $steam_id = false;
+            {
+
+                $cache_value = $try_cache->fetch_assoc();
+
+                if($cache_value['filled'] == 1)
+                {
+
+                    foreach($cache_value as $key => $item)
+                    {
+                        if(!empty($item) && $item !== '' && $key !== 'filled' && !isset($resource_stats[$key]))
+                            $resource_stats[$key] = $item;
+                    }
+
+                }
+
+            }
 
         }
+
         elseif($link_segments[3] == 'profiles')
         {
-            $steam_id = $link_segments[4];
-        }
 
-        if($steam_id !== false)
-        {
-            $try_get_user_info = $this->try_get_url_content("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=" . $config['steam_web_api_key'] . "&steamids=" . $steam_id . "&format=json", 3);
-        }
-        else
-        {
-            //сконфигурировать профиль из url
-        }
-    }
+            $resource_stats['title_type'] = 'profile_id';
+            $resource_stats['profile_name'] = $link_segments[4];
 
-    private function try_get_url_content($url, $try_count)
-    {
-
-        $try_get_content = @file_get_contents($url);
-
-        if($try_get_content == false)
-        {
-
-            $try_count = $try_count - 1;
-
-            if($try_count < 0)
-                return false;
+            if(mysqli_num_rows($try_cache) == 0)
+                $this->mysql_connect->query("INSERT INTO `users_cache` (`link`, `profile_id`, `filled`) VALUES ('" . $link. "', '" . $link_segments[4] . "', 0);");
             else
-                return $this->try_get_url_content($url, $try_count);
+            {
+
+                $cache_value = $try_cache->fetch_assoc();
+
+                if($cache_value['filled'] == 1)
+                {
+
+                    foreach($cache_value as $key => $item)
+                    {
+                        if(!empty($item) && $item !== '' && $key !== 'filled' && !isset($resource_stats[$key]))
+                            $resource_stats[$key] = $item;
+                    }
+
+                }
+
+            }
 
         }
-        else
-            return $try_get_content;
+
+        return $resource_stats;
 
     }
+
 
 
 }
