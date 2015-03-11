@@ -19,7 +19,7 @@ CREATE TABLE `request_limit` (
   `count` int(2) DEFAULT NULL,
   `datetime` datetime DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- ----------------------------
 -- Table structure for reviews_cache
@@ -35,7 +35,7 @@ CREATE TABLE `reviews_cache` (
   `datetime` datetime DEFAULT NULL,
   `items` mediumtext,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- ----------------------------
 -- Table structure for search_cache
@@ -48,7 +48,20 @@ CREATE TABLE `search_cache` (
   `search` varchar(250) DEFAULT NULL,
   `items` text,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- ----------------------------
+-- Table structure for shared_files_cache
+-- ----------------------------
+DROP TABLE IF EXISTS `shared_files_cache`;
+CREATE TABLE `shared_files_cache` (
+  `id` varchar(100) NOT NULL,
+  `type` char(255) DEFAULT NULL,
+  `direct_url` varchar(255) DEFAULT NULL,
+  `filled` char(255) DEFAULT '0',
+  `game` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- ----------------------------
 -- Table structure for users_cache

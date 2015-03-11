@@ -194,7 +194,7 @@ class Core extends Config
 
     public function get_reviews_from_steam()
     {
-        $config = $this->get_config();
+
         $UrlContent = new UrlContent();
 
         $url = 'http://store.steampowered.com/appreviews/' . $_GET['app'] . '?start_offset=' . $_GET['offset'] . '&day_range=' . $_GET['day_range'] . '&filter=' . $_GET['filter'] . '&language=' . $_GET['language'];
@@ -562,6 +562,7 @@ class Core extends Config
             $resource_stats = YouTubeInfo::get_youtube_info($link);
 
             return $resource_stats;
+
         }
         else
         {
@@ -571,20 +572,11 @@ class Core extends Config
 
             /* Detect shared steam resources */
             if($link_segments[3] == 'sharedfiles')
-            {
-
-                $resource_stats['type'] = 'steam_file';
-                $resource_stats['link'] = $link;
-
-            }
+                $resource_stats = SteamSharedFiles::get_sharedfiles($link);
 
             /* Detect steam profiles link */
             elseif($link_segments[3] == 'id' || $link_segments[3] == 'profiles')
-            {
-
                 $resource_stats = SteamUserInfo::get_user_info_by_url($link);
-
-            }
 
             else
             {
@@ -869,6 +861,52 @@ class UrlContent extends Core
         }
         else
             return $try_get_content;
+
+    }
+
+}
+
+class SteamSharedFiles extends Core
+{
+
+    public function get_sharedfiles($link)
+    {
+
+        $resource_stats = array(
+            'type' => 'steam_file',
+            'link' => $link
+        );
+
+        $detect_file_id = explode('?id=', $link);
+
+        if(count($detect_file_id) !== 2)
+            return $resource_stats;
+
+        $file_id = $detect_file_id[1];
+
+        $try_cache = $this->mysql_connect->query("SELECT `id`, `type`, `direct_url`, `filled`, `game` FROM (`shared_files_cache`) WHERE `id` = '" . $file_id . "'");
+
+        if(mysqli_num_rows($try_cache) == 0)
+            $this->mysql_connect->query("INSERT INTO `shared_files_cache` (`id`, `filled`) VALUES ('" . $file_id . "', 0);");
+        else
+        {
+
+            $cache_value = $try_cache->fetch_assoc();
+
+            if($cache_value['filled'] == 1)
+            {
+
+                foreach($cache_value as $key => $item)
+                {
+                    if(!empty($item) && $item !== '' && $key !== 'filled' && !isset($resource_stats[$key]))
+                        $resource_stats[$key] = $item;
+                }
+
+            }
+
+        }
+
+        return $resource_stats;
 
     }
 
