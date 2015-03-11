@@ -203,175 +203,9 @@ class Core extends Config
         if($steam_json->success !== 1)
             die('App not found');
 
-        return $this->detect_reviews_in_html($steam_json->html);
+        return HtmlProcessing::detect_reviews_in_html($steam_json->html);
 
     }
-
-    public function detect_reviews_in_html($html)
-    {
-
-        $reviews_explode = explode('<div class="review_box">', $html);
-        unset($reviews_explode[0]);
-
-        if(empty($reviews_explode))
-            die('No reviews');
-
-        $items = array();
-
-        foreach($reviews_explode as $item)
-        {
-
-            $new_item = array();
-            $resource_counter = 0;
-
-            $dirty_date = get_string_between($item, '<div class="postedDate">', '</div>');
-            $new_item['publish_date'] = str_replace("	", "", $dirty_date);
-
-            //$test = explode(': ', $new_item['publish_date']);
-            //overdie(date("d-m-Y", strtotime($test[1])));
-
-            //detect and clear review text
-            $dirty_text = get_string_between($item, '<div class="content">', '<div class="gradient"></div>');
-            $dirty_text = str_replace("\r\n", "", $dirty_text);
-
-            $dirty_text = str_replace('<div class="bb_h1">', "[h1]", $dirty_text);
-            $dirty_text = str_replace('</div>', "[/h1]", $dirty_text);
-
-            $dirty_text = str_replace('<div class="bb_code">', "", $dirty_text);
-
-            $dirty_text = str_replace('<b>', "[b]", $dirty_text);
-            $dirty_text = str_replace('</b>', "[/b]", $dirty_text);
-
-            $dirty_text = str_replace('<span class="bb_spoiler"><span>', "[spoiler]", $dirty_text);
-            $dirty_text = str_replace('</span></span>', "[/spoiler]", $dirty_text);
-
-            $dirty_text = str_replace('<ul class="bb_ul">', "[ul]", $dirty_text);
-            $dirty_text = str_replace('</ul>', "[/ul]", $dirty_text);
-
-            $dirty_text = str_replace('<li>', "[li]", $dirty_text);
-            $dirty_text = str_replace('</li>', "[/li]", $dirty_text);
-
-            $dirty_text = str_replace('<u>', "[u]", $dirty_text);
-            $dirty_text = str_replace('</u>', "[/u]", $dirty_text);
-
-            $dirty_text = str_replace('<i>', "[i]", $dirty_text);
-            $dirty_text = str_replace('</i>', "[/i]", $dirty_text);
-
-            $dirty_text = str_replace('<blockquote class="bb_blockquote">', "[bq]", $dirty_text);
-            $dirty_text = str_replace('</blockquote>', "[/bq]", $dirty_text);
-
-            $dirty_text = str_replace('<br>', "[br]", $dirty_text);
-
-            $dirty_text = str_replace('&quot;', '"', $dirty_text);
-
-            /* parse insults */
-            $dirty_text = str_replace_group('♥', "[c]", $dirty_text);
-
-
-            /* parse links */
-
-            //detect count resources in text
-            $resource_count = substr_count($dirty_text, '<a class="bb_link" target="_blank" href="');
-
-            if($resource_count > 0)
-            {
-
-                for ($iteration = 1; $iteration <= $resource_count; $iteration++) {
-
-                    $resource_type = 'dynamiclink';
-                    $detect_link = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="', '"  id="dynamiclink_' . ($iteration - 1) . '">');
-
-                    if($detect_link == false)
-                    {
-                        $resource_type = 'otherlink';
-                        $detect_link = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="', '" >');
-                    }
-
-
-                    if($detect_link != false)
-                    {
-
-                        $resource_counter++;
-                        $new_item['resources']['resource_' . $resource_counter] = $this->detect_resource($detect_link);
-
-                        switch ($resource_type)
-                        {
-                            case 'dynamiclink':
-                                $resource_html = '<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . ($iteration - 1) . '">' . $detect_link . '</a>';
-                                break;
-                            case 'otherlink':
-                                $detect_link_name = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="' . $detect_link . '" >', '</a>');
-                                $resource_html = '<a class="bb_link" target="_blank" href="' . $detect_link . '" >' . $detect_link_name . '</a>';
-                                break;
-                        }
-
-                        $dirty_text = str_replace($resource_html, '[resource_' . $resource_counter . ']', $dirty_text);
-
-                    }
-
-                }
-
-            }
-
-
-            $new_item['text'] = str_replace("	", "", $dirty_text);
-
-            //detect and calculate stats
-            $stats = get_string_between($item, '<div class="header">', '</div>');
-            $detect_stats = explode(' ', $stats);
-            $new_item['positive_votes'] = (int)str_replace(",", "", $detect_stats[0]);
-            $new_item['all_votes'] = (int)str_replace(",", "", $detect_stats[2]);
-
-            if($new_item['positive_votes'] == 0)
-                $new_item['positive_votes'] = 1;
-
-            if($new_item['all_votes'] == 0)
-                $new_item['all_votes'] = 1;
-
-            $new_item['rate'] = round($new_item['positive_votes'] / ($new_item['all_votes'] / 100));
-
-            //detect review vote
-            if(substr_count($item, 'icon_thumbsUp_v6.png') == 1)
-                $new_item['vote'] = 'positive';
-            elseif(substr_count($item, 'icon_thumbsDown_v6.png') == 1)
-                $new_item['vote'] = 'negative';
-            else
-                $new_item['vote'] = 'undefined';
-
-            //detect author info
-            $dirty_author_name = get_string_between($item, '<div class="persona_name"><a href="', '</a></div>');
-            $dirty_author_name_e = explode('">', $dirty_author_name);
-            $new_item['author_name'] = $dirty_author_name_e[1];
-
-            $new_item['author_profile'] = get_string_between($item, '<div class="persona_name"><a href="', '" data-miniprofile="');
-
-            $dirty_author_number_of_games = get_string_between($item, '<div class="num_owned_games"><a href="', '</a></div>');
-            $dirty_author_number_of_games_e = explode('">', $dirty_author_number_of_games);
-            $dirty_author_number_of_games_e2 = explode(' ', $dirty_author_number_of_games_e[1]);
-            $new_item['author_number_of_games'] = end($dirty_author_number_of_games_e2);
-
-            $dirty_author_number_of_reviews = get_string_between($item, '<div class="num_reviews"><a href="', '</a></div>');
-            $dirty_author_number_of_reviews_e = explode('">', $dirty_author_number_of_reviews);
-            $dirty_author_number_of_reviews_e2 = explode(' ', $dirty_author_number_of_reviews_e[1]);
-            $new_item['author_number_of_reviews'] = end($dirty_author_number_of_reviews_e2);
-
-            $dirty_author_avatar = get_string_between($item, '<div class="playerAvatar', '</div>');
-            $new_item['author_avatar'] = get_string_between($dirty_author_avatar, '<img src="', '" data-miniprofile="');
-
-            $dirty_author_played = get_string_between($item, '<div class="hours">', '</div>');
-            $dirty_author_played_e = explode(' ', $dirty_author_played);
-            $new_item['author_played'] = $dirty_author_played_e[0];
-
-            $items[] = $new_item;
-
-        }
-
-        return $items;
-
-    }
-
-
-
 
     public function get_search_query_validate()
     {
@@ -526,29 +360,7 @@ class Core extends Config
         $url = 'http://store.steampowered.com/search/suggest?term=' . urlencode($_GET['term']) . '&f=games&cc=' . mb_strtoupper($config['language_header_components'][$_GET['language']]['header']) . '&l=' . $config['language_header_components'][$_GET['language']]['cookie'];
         $steam_html = $UrlContent->try_get_url_content($url);
 
-        return $this->detect_search_result_in_html($steam_html);
-
-    }
-
-    public function detect_search_result_in_html($html)
-    {
-
-        $html_items = explode('<a class="match ds_collapse_flag "', $html);
-        unset($html_items[0]);
-
-        $items_id = array();
-
-        foreach($html_items as $item)
-        {
-
-            $app_id = get_string_between($item, 'data-ds-appid="', '" href');
-            $app_name = get_string_between($item, '<div class="match_name">', '</div>');
-
-            $items_id[] = array('app_id' => $app_id, 'name' => $app_name);
-
-        }
-
-        return $items_id;
+        return HtmlProcessing::detect_search_result_in_html($steam_html);
 
     }
 
@@ -907,6 +719,198 @@ class SteamSharedFiles extends Core
         }
 
         return $resource_stats;
+
+    }
+
+}
+
+class HtmlProcessing extends Core
+{
+
+    public function detect_search_result_in_html($html)
+    {
+
+        $html_items = explode('<a class="match ds_collapse_flag "', $html);
+        unset($html_items[0]);
+
+        $items_id = array();
+
+        foreach($html_items as $item)
+        {
+
+            $app_id = get_string_between($item, 'data-ds-appid="', '" href');
+            $app_name = get_string_between($item, '<div class="match_name">', '</div>');
+
+            $items_id[] = array('app_id' => $app_id, 'name' => $app_name);
+
+        }
+
+        return $items_id;
+
+    }
+
+    public function detect_reviews_in_html($html)
+    {
+
+        $reviews_explode = explode('<div class="review_box">', $html);
+        unset($reviews_explode[0]);
+
+        if(empty($reviews_explode))
+            die('No reviews');
+
+        $items = array();
+
+        foreach($reviews_explode as $item)
+        {
+
+            /* harvester block */
+            $new_item = array();
+            $resource_counter = 0;
+
+            $dirty_date = get_string_between($item, '<div class="postedDate">', '</div>');
+            $new_item['publish_date'] = trim($dirty_date);
+
+            /* detect and clear html */
+            $dirty_text = get_string_between($item, '<div class="content">', '<div class="gradient"></div>');
+            $dirty_text = str_replace("\r\n", "", $dirty_text);
+
+            $dirty_text = trim($dirty_text);
+
+            $dirty_text = str_replace('<div class="bb_h1">', "[h1]", $dirty_text);
+            $dirty_text = str_replace('</div>', "[/h1]", $dirty_text);
+
+            $dirty_text = str_replace('<div class="bb_code">', "", $dirty_text);
+
+            $dirty_text = str_replace('<b>', "[b]", $dirty_text);
+            $dirty_text = str_replace('</b>', "[/b]", $dirty_text);
+
+            $dirty_text = str_replace('<span class="bb_spoiler"><span>', "[spoiler]", $dirty_text);
+            $dirty_text = str_replace('</span></span>', "[/spoiler]", $dirty_text);
+
+            $dirty_text = str_replace('<ul class="bb_ul">', "[ul]", $dirty_text);
+            $dirty_text = str_replace('</ul>', "[/ul]", $dirty_text);
+
+            $dirty_text = str_replace('<li>', "[li]", $dirty_text);
+            $dirty_text = str_replace('</li>', "[/li]", $dirty_text);
+
+            $dirty_text = str_replace('<u>', "[u]", $dirty_text);
+            $dirty_text = str_replace('</u>', "[/u]", $dirty_text);
+
+            $dirty_text = str_replace('<i>', "[i]", $dirty_text);
+            $dirty_text = str_replace('</i>', "[/i]", $dirty_text);
+
+            $dirty_text = str_replace('<blockquote class="bb_blockquote">', "[bq]", $dirty_text);
+            $dirty_text = str_replace('</blockquote>', "[/bq]", $dirty_text);
+
+            $dirty_text = str_replace('<br>', "[br]", $dirty_text);
+
+            $dirty_text = str_replace('&quot;', '"', $dirty_text);
+
+            /* parse insults */
+            $dirty_text = str_replace_group('♥', "[c]", $dirty_text);
+
+            /* resources block */
+            /* detect count resources in text */
+            $resource_count = substr_count($dirty_text, '<a class="bb_link" target="_blank" href="');
+
+            if($resource_count > 0)
+            {
+
+                for ($iteration = 1; $iteration <= $resource_count; $iteration++) {
+
+                    /* set default resource type */
+                    $resource_type = 'dynamiclink';
+                    $detect_link = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="', '"  id="dynamiclink_' . ($iteration - 1) . '">');
+
+                    if($detect_link == false)
+                    {
+                        /* if can't detect link type */
+                        $resource_type = 'otherlink';
+                        $detect_link = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="', '" >');
+                    }
+
+
+                    if($detect_link != false)
+                    {
+
+                        $resource_counter++;
+                        $new_item['resources']['resource_' . $resource_counter] = $this->detect_resource($detect_link);
+
+                        switch ($resource_type)
+                        {
+                            case 'dynamiclink':
+                                $resource_html = '<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . ($iteration - 1) . '">' . $detect_link . '</a>';
+                                break;
+                            case 'otherlink':
+                                $detect_link_name = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="' . $detect_link . '" >', '</a>');
+                                $resource_html = '<a class="bb_link" target="_blank" href="' . $detect_link . '" >' . $detect_link_name . '</a>';
+                                break;
+                        }
+
+                        $dirty_text = str_replace($resource_html, '[resource_' . $resource_counter . ']', $dirty_text);
+
+                    }
+
+                }
+
+            }
+
+
+            $new_item['text'] = str_replace("	", "", $dirty_text);
+
+            //detect and calculate stats
+            $stats = get_string_between($item, '<div class="header">', '</div>');
+            $stats = trim($stats);
+
+            $detect_stats = explode(' ', $stats);
+            $new_item['positive_votes'] = (int)str_replace(",", "", $detect_stats[0]);
+            $new_item['all_votes'] = (int)str_replace(",", "", $detect_stats[2]);
+
+            if($new_item['positive_votes'] == 0)
+                $new_item['positive_votes'] = 1;
+
+            if($new_item['all_votes'] == 0)
+                $new_item['all_votes'] = 1;
+
+            $new_item['rate'] = round($new_item['positive_votes'] / ($new_item['all_votes'] / 100));
+
+            //detect review vote
+            if(substr_count($item, 'icon_thumbsUp_v6.png') == 1)
+                $new_item['vote'] = 'positive';
+            elseif(substr_count($item, 'icon_thumbsDown_v6.png') == 1)
+                $new_item['vote'] = 'negative';
+            else
+                $new_item['vote'] = 'undefined';
+
+            //detect author info
+            $dirty_author_name = get_string_between($item, '<div class="persona_name"><a href="', '</a></div>');
+            $dirty_author_name_e = explode('">', $dirty_author_name);
+            $new_item['author_name'] = $dirty_author_name_e[1];
+
+            $new_item['author_profile'] = get_string_between($item, '<div class="persona_name"><a href="', '" data-miniprofile="');
+
+            $dirty_author_number_of_games = get_string_between($item, '<div class="num_owned_games"><a href="', '</a></div>');
+            $dirty_author_number_of_games_e = explode('">', $dirty_author_number_of_games);
+            $dirty_author_number_of_games_e2 = explode(' ', $dirty_author_number_of_games_e[1]);
+            $new_item['author_number_of_games'] = end($dirty_author_number_of_games_e2);
+
+            $dirty_author_number_of_reviews = get_string_between($item, '<div class="num_reviews"><a href="', '</a></div>');
+            $dirty_author_number_of_reviews_e = explode('">', $dirty_author_number_of_reviews);
+            $dirty_author_number_of_reviews_e2 = explode(' ', $dirty_author_number_of_reviews_e[1]);
+            $new_item['author_number_of_reviews'] = end($dirty_author_number_of_reviews_e2);
+
+            $dirty_author_avatar = get_string_between($item, '<div class="playerAvatar', '</div>');
+            $new_item['author_avatar'] = get_string_between($dirty_author_avatar, '<img src="', '" data-miniprofile="');
+
+            $dirty_author_played = get_string_between($item, '<div class="hours">', '</div>');
+            $dirty_author_played_e = explode(' ', $dirty_author_played);
+            $new_item['author_played'] = $dirty_author_played_e[0];
+
+            $items[] = $new_item;
+
+        }
+
+        return $items;
 
     }
 
