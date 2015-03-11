@@ -884,7 +884,7 @@ class SteamSharedFiles extends Core
 
         $file_id = $detect_file_id[1];
 
-        $try_cache = $this->mysql_connect->query("SELECT `id`, `type`, `direct_url`, `filled`, `game` FROM (`shared_files_cache`) WHERE `id` = '" . $file_id . "'");
+        $try_cache = $this->mysql_connect->query("SELECT `id`, `file_type`, `direct_url`, `filled`, `game` FROM (`shared_files_cache`) WHERE `id` = '" . $file_id . "'");
 
         if(mysqli_num_rows($try_cache) == 0)
             $this->mysql_connect->query("INSERT INTO `shared_files_cache` (`id`, `filled`) VALUES ('" . $file_id . "', 0);");

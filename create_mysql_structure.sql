@@ -56,10 +56,10 @@ CREATE TABLE `search_cache` (
 DROP TABLE IF EXISTS `shared_files_cache`;
 CREATE TABLE `shared_files_cache` (
   `id` varchar(100) NOT NULL,
-  `type` char(255) DEFAULT NULL,
+  `file_type` char(255) DEFAULT NULL,
   `direct_url` varchar(255) DEFAULT NULL,
-  `filled` char(255) DEFAULT '0',
   `game` varchar(255) DEFAULT NULL,
+  `filled` char(255) DEFAULT '0',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
