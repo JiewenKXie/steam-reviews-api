@@ -18,7 +18,7 @@
         {
             margin: 20px 0 0 20px;
             font-family: Verdana, sans-serif;
-            font-size: 22px;
+            font-size: 24px;
             color: #383838;
         }
         ul li
@@ -26,9 +26,6 @@
             background-color: #383838;
             margin: 0 20px 10px 0;
             padding: 10px;
-            -webkit-box-shadow: 2px 2px 0px 0px rgba(145, 145, 145, 0.75);
-            -moz-box-shadow:    2px 2px 0px 0px rgba(145, 145, 145, 0.75);
-            box-shadow:         2px 2px 0px 0px rgba(145, 145, 145, 0.75);
         }
         ul
         {
@@ -44,12 +41,15 @@
         .content
         {
             background-color: #F7F7F7;
-            border: 1px solid #C8C8C8;
-            width: 600px;
-            margin: 20px auto 0;
-            -webkit-box-shadow: 1px 1px 1px 0px rgba(110, 110, 110, 0.1);
-            -moz-box-shadow:    1px 1px 1px 0px rgba(110, 110, 110, 0.1);
-            box-shadow:         1px 1px 1px 0px rgba(110, 110, 110, 0.1);
+            width: 1000px;
+            margin: 40px auto 0;
+            padding: 2px 0;
+            -webkit-box-shadow: 0px 0px 1px 1px rgba(221, 221, 221, 1);
+            -moz-box-shadow:    0px 0px 1px 1px rgba(221, 221, 221, 1);
+            box-shadow:         0px 0px 1px 1px rgba(221, 221, 221, 1);
+            -webkit-border-radius: 4px;
+            -moz-border-radius: 4px;
+            border-radius: 4px;
         }
         .function_link
         {
@@ -71,7 +71,7 @@
 <body>
 
 <div class="content">
-    <h2>Steam Reviews API</h2>
+    <h2><!--Steam Reviews API-->Header</h2>
     <div class="text_block">
         Key features:
         <ul>
