@@ -13,6 +13,7 @@
             margin: 0;
             padding: 0;
             font-family: Arial, sans-serif;
+            background: #EEEEEE;
         }
         h2
         {
@@ -40,7 +41,7 @@
         }
         .content
         {
-            background-color: #F7F7F7;
+            background-color: #F9F9F9;
             width: 1000px;
             margin: 40px auto 0;
             padding: 2px 0;
@@ -71,7 +72,7 @@
 <body>
 
 <div class="content">
-    <h2><!--Steam Reviews API-->Header</h2>
+    <h2>Steam Reviews API</h2>
     <div class="text_block">
         Key features:
         <ul>
