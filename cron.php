@@ -165,6 +165,8 @@ class Cron extends Core
         $already_added = array();
         $formation_insert_query = array();
 
+        $current_datetime = date('Y-m-d H:i:s');
+
         foreach($connected_items as $item)
         {
 
@@ -172,7 +174,7 @@ class Cron extends Core
             {
 
                 $already_added[] = $item['author_profile'];
-                $formation_insert_query[] = "('" . mysql_real_escape_string($item['author_profile']) . "', '" . mysql_real_escape_string($item['author_name']) . "', '" . mysql_real_escape_string($item['author_avatar']) . "', 1)";
+                $formation_insert_query[] = "('" . mysql_real_escape_string($item['author_profile']) . "', '" . mysql_real_escape_string($item['author_name']) . "', '" . mysql_real_escape_string($item['author_avatar']) . "', 1, '" . $current_datetime . "')";
 
             }
 
@@ -182,7 +184,7 @@ class Cron extends Core
         if(!empty($formation_insert_query))
         {
             $formation_query_values = implode(',', $formation_insert_query);
-            $this->mysql_connect->query("INSERT INTO `users_cache` (`link`, `profile_name`, `avatar`, `filled`) VALUES " . $formation_query_values);
+            $this->mysql_connect->query("INSERT INTO `users_cache` (`link`, `profile_name`, `avatar`, `filled`, `datetime`) VALUES " . $formation_query_values);
         }
 
     }

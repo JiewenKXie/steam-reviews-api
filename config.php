@@ -54,7 +54,7 @@ class Config
 
             /* Cron config */
             'cron_access_ip' => array('127.0.0.1'),
-            'cron_update_users_cache' => '2 days'
+            'cron_update_users_cache' => '5 days'
 
         );
 
