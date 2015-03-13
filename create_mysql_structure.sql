@@ -73,7 +73,7 @@ CREATE TABLE `users_cache` (
   `profile_name` varchar(140) DEFAULT NULL,
   `real_name` varchar(255) DEFAULT NULL,
   `avatar` varchar(255) DEFAULT NULL,
-  `lang` char(255) DEFAULT NULL,
+  `lang` varchar(20) DEFAULT NULL,
   `filled` tinyint(1) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
