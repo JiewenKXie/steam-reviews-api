@@ -22,6 +22,8 @@ class Cron extends Core
 
         $this->do_mysql_connect();
 
+        $this->check_to_relevant_cache();
+        $this->collection_users_in_cache();
         $this->collection_data_users();
 
     }
@@ -87,6 +89,8 @@ class Cron extends Core
                     if(isset($info->response->players[0]->loccountrycode))
                         $form_array[$k]['lang'] = $info->response->players[0]->loccountrycode;
 
+                    $form_array[$k]['datetime'] = date('Y-m-d H:i:s');
+
                     $form_array[$k]['filled'] = 1;
 
                     $gen_query = '';
@@ -110,6 +114,117 @@ class Cron extends Core
             }
 
         }
+
+    }
+
+    private function collection_users_in_cache()
+    {
+
+        /* Get current users cache */
+        $try_cache = $this->mysql_connect->query("SELECT `link` FROM (`users_cache`)");
+
+        $form_array = array();
+        while ($row = $try_cache->fetch_assoc()){
+            $form_array[] = $row;
+        }
+
+        $user_cache = array();
+        foreach($form_array as $link)
+            $user_cache[] = $link['link'];
+
+        /* Users from reviews cache */
+        $try_reviews_cache = $this->mysql_connect->query("SELECT `items` FROM (`reviews_cache`)");
+
+        $form_reviews_array = array();
+        while ($row = $try_reviews_cache->fetch_assoc()){
+            $form_reviews_array[] = $row;
+        }
+
+        /* Decode */
+        $form_decode_cache_list = array();
+        foreach($form_reviews_array as $item)
+            $form_decode_cache_list[] = unserialize(base64_decode($item['items']));
+
+        /* Connect items */
+        $connected_items = array();
+        foreach($form_decode_cache_list as $item)
+            $connected_items = array_merge($connected_items, $item);
+
+        /* Remove duplicate */
+        $cache_duplicate = array();
+        foreach($connected_items as $id => $item)
+        {
+
+            if(in_array($item['text'], $cache_duplicate))
+                unset($connected_items[$id]);
+            else
+                $cache_duplicate[] = $item['text'];
+
+        }
+
+        $already_added = array();
+        $formation_insert_query = array();
+
+        foreach($connected_items as $item)
+        {
+
+            if(!in_array($item['author_profile'], $user_cache) && !in_array($item['author_profile'], $already_added))
+            {
+
+                $already_added[] = $item['author_profile'];
+                $formation_insert_query[] = "('" . mysql_real_escape_string($item['author_profile']) . "', '" . mysql_real_escape_string($item['author_name']) . "', '" . mysql_real_escape_string($item['author_avatar']) . "', 1)";
+
+            }
+
+        }
+
+        /* Set new users */
+        if(!empty($formation_insert_query))
+        {
+            $formation_query_values = implode(',', $formation_insert_query);
+            $this->mysql_connect->query("INSERT INTO `users_cache` (`link`, `profile_name`, `avatar`, `filled`) VALUES " . $formation_query_values);
+        }
+
+    }
+
+    private function check_to_relevant_cache()
+    {
+
+        /* Get config */
+        $config = $this->get_config();
+
+        /* Get dates steam users from base */
+        $try_cache = $this->mysql_connect->query("SELECT `link`, `datetime` FROM (`users_cache`)");
+
+        $form_array = array();
+        while ($row = $try_cache->fetch_assoc()){
+            $form_array[] = $row;
+        }
+
+        /* Formation old users array */
+        $update_list = array();
+        foreach($form_array as $id => $item)
+        {
+
+            if(empty($item['datetime']))
+                $update_list[] = $item['link'];
+
+            $compare_datetime = recalculate_date($item['datetime'], '+' . $config['cron_update_users_cache']);
+            $current_datetime = date('Y-m-d H:i:s');
+
+            if($compare_datetime < $current_datetime)
+                $update_list[] = $item['link'];
+
+        }
+
+        /* Update not relevant users */
+        $pre_mysql_form = array();
+        foreach($update_list as $item)
+            $pre_mysql_form[] = "`link` = '" . $item . "'";
+
+        $where_part = implode(' OR ', $pre_mysql_form);
+
+        $this->mysql_connect->query("UPDATE `users_cache` SET `datetime` = '" . date('Y-m-d H:i:s') . "', `filled` = '0' WHERE " . $where_part);
 
     }
 

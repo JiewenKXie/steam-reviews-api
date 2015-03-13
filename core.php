@@ -88,7 +88,7 @@ class Core extends Config
         }
 
         //if it exists, but expired
-        elseif($result['datetime'] < recalculate_date(date('Y-m-d H:i:s'), '-' . $config['request_limit_time_in_minutes'] . ' minutes'))
+        elseif($result['datetime'] < recalculate_date(date('Y-m-d H:i:s'), '-' . $config['request_limit_time_in_minutes']))
         {
 
             $this->mysql_connect->query("DELETE FROM `request_limit` WHERE `ip` = '" . $ip . "'");
@@ -104,7 +104,7 @@ class Core extends Config
             $count++;
 
             if($count >= $config['count_request_limit'])
-                die('Exceeded the query limit. The limit is reset at ' . recalculate_date($result['datetime'], '+' . $config['request_limit_time_in_minutes'] . ' minutes'));
+                die('Exceeded the query limit. The limit is reset at ' . recalculate_date($result['datetime'], '+' . $config['request_limit_time_in_minutes']));
 
             $this->mysql_connect->query("UPDATE `request_limit` SET `count` = " . $count . " WHERE `id` = " . $result['id']);
 
@@ -163,7 +163,7 @@ class Core extends Config
         }
 
         //if it exists, but expired
-        elseif(date('Y-m-d H:i:s') > recalculate_date($result['datetime'], '+' . $config['reviews_cache_time'] . ' minutes'))
+        elseif(date('Y-m-d H:i:s') > recalculate_date($result['datetime'], '+' . $config['reviews_cache_time']))
         {
 
             $items = $this->get_reviews_from_steam();
@@ -276,7 +276,7 @@ class Core extends Config
         }
 
         //if it exists, but expired
-        elseif(date('Y-m-d H:i:s') > recalculate_date($result['datetime'], '+' . $config['search_cache_time'] . ' minutes'))
+        elseif(date('Y-m-d H:i:s') > recalculate_date($result['datetime'], '+' . $config['search_cache_time']))
         {
 
             $items = $this->get_search_result_from_steam();
