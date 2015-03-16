@@ -43,10 +43,12 @@ class Config
             'search_cache_time'  => '60 minutes',
 
             /* Available avatars size */
+            'avatar_url_part' => 'http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/',
+
             'app_image_types' => array(
-                '120_45' => 'capsule_sm_120.jpg',
-                '184_69' => 'capsule_184x69.jpg',
-                '460_215' => 'header.jpg'
+                'small' => 'capsule_sm_120.jpg',
+                'medium' => 'capsule_184x69.jpg',
+                'big' => 'header.jpg'
             ),
 
             /* Steam API config */
@@ -54,7 +56,10 @@ class Config
 
             /* Cron config */
             'cron_access_ip' => array('127.0.0.1'),
-            'cron_update_users_cache' => '5 days'
+            'cron_update_users_cache' => '5 days',
+
+            /* Profile part */
+            'profile_url_part' => 'http://steamcommunity.com/'
 
         );
 

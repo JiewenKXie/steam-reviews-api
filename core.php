@@ -225,6 +225,7 @@ class Core extends Config
 
         $Render = new Render();
 
+        /* Detect render type */
         if(isset($_GET['result']) && in_array($_GET['result'], array('xml', 'json', 'serialize')))
             $render_type = $_GET['result'];
         else
@@ -372,7 +373,6 @@ class Core extends Config
         {
 
             $resource_stats = YouTubeInfo::get_youtube_info($link);
-
             return $resource_stats;
 
         }
@@ -399,6 +399,56 @@ class Core extends Config
             return $resource_stats;
 
         }
+
+    }
+
+    public function set_items_avatars($array)
+    {
+
+        if(!empty($array))
+        {
+
+            $config = $this->get_config();
+
+            foreach($array as $id => $item)
+            {
+
+                if(isset($item['app_id']))
+                {
+                    foreach($config['app_image_types'] as $size => $part)
+                        $array[$id]['avatars'][$size] = 'http://cdn.akamai.steamstatic.com/steam/apps/' . $item['app_id'] . '/' . $part;
+                }
+
+            }
+
+        }
+
+        return $array;
+
+    }
+
+    public function set_items_links($array)
+    {
+
+        if(!empty($array))
+        {
+
+            $config = $this->get_config();
+
+            foreach($array as $id => $item)
+            {
+
+                if(isset($item['author_avatar']))
+                    $array[$id]['author_avatar'] = $config['avatar_url_part'] . $item['author_avatar'];
+
+                if(isset($item['author_profile']))
+                    $array[$id]['author_profile'] = $config['profile_url_part'] . $item['author_profile'];
+
+            }
+
+        }
+
+        return $array;
 
     }
 
@@ -765,7 +815,6 @@ class HtmlProcessing extends Core
 
             /* harvester block */
             $new_item = array();
-            $resource_counter = 0;
 
             $dirty_date = get_string_between($item, '<div class="postedDate">', '</div>');
             $new_item['publish_date'] = trim($dirty_date);
@@ -816,38 +865,54 @@ class HtmlProcessing extends Core
             if($resource_count > 0)
             {
 
-                for ($iteration = 1; $iteration <= $resource_count; $iteration++) {
+                $resource_counter = 1;
+                /* explode text by links */
+                $resources_array = explode('<a class="bb_link" ', $dirty_text);
+                unset($resources_array[0]);
 
-                    /* set default resource type */
-                    $resource_type = 'dynamiclink';
-                    $detect_link = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="', '"  id="dynamiclink_' . ($iteration - 1) . '">');
+                foreach($resources_array as $key => $item)
+                {
 
-                    if($detect_link == false)
-                    {
-                        /* if can't detect link type */
-                        $resource_type = 'otherlink';
-                        $detect_link = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="', '" >');
-                    }
+                    /* Check to isset link */
+                    $detect_link = substr_count($item, 'target="_blank"');
 
-
-                    if($detect_link != false)
+                    if($detect_link == 1)
                     {
 
-                        $resource_counter++;
-                        $new_item['resources']['resource_' . $resource_counter] = $this->detect_resource($detect_link);
+                        /* Detect dynamiclink */
+                        $detect_dynamic = substr_count($item, 'id="dynamiclink_');
 
-                        switch ($resource_type)
+                        if($detect_dynamic == 1)
                         {
-                            case 'dynamiclink':
-                                $resource_html = '<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . ($iteration - 1) . '">' . $detect_link . '</a>';
-                                break;
-                            case 'otherlink':
-                                $detect_link_name = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="' . $detect_link . '" >', '</a>');
-                                $resource_html = '<a class="bb_link" target="_blank" href="' . $detect_link . '" >' . $detect_link_name . '</a>';
-                                break;
-                        }
 
-                        $dirty_text = str_replace($resource_html, '[resource_' . $resource_counter . ']', $dirty_text);
+                            /* dynamiclink */
+                            $dynamiclink_value = get_string_between($item, '  id="dynamiclink_', '">');
+                            $detect_link = get_string_between($item, 'target="_blank" href="', '"  id="dynamiclink_' . $dynamiclink_value);
+
+                            /* detect resource */
+                            $new_item['resources']['resource_' . $resource_counter] = $this->detect_resource($detect_link);
+
+                            /* cap link */
+                            $dirty_text = str_replace('<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . $dynamiclink_value . '">' . $detect_link . '</a>', "[resource_" . $resource_counter . "]", $dirty_text);
+
+                            $resource_counter++;
+
+                        }
+                        else
+                        {
+
+                            /* other link */
+                            $detect_link = get_string_between($item, 'target="_blank" href="', '" >');
+
+                            /* detect resource */
+                            $new_item['resources']['resource_' . $resource_counter] = $this->detect_resource($detect_link);
+
+                            /* cap link */
+                            $dirty_text = str_replace('<a class="bb_link" target="_blank" href="' . $detect_link . '" >' . $detect_link . '</a>', "[resource_" . $resource_counter . "]", $dirty_text);
+
+                            $resource_counter++;
+
+                        }
 
                     }
 
@@ -855,8 +920,7 @@ class HtmlProcessing extends Core
 
             }
 
-
-            $new_item['text'] = str_replace("	", "", $dirty_text);
+            $new_item['text'] = trim($dirty_text);
 
             //detect and calculate stats
             $stats = get_string_between($item, '<div class="header">', '</div>');
@@ -887,7 +951,7 @@ class HtmlProcessing extends Core
             $dirty_author_name_e = explode('">', $dirty_author_name);
             $new_item['author_name'] = $dirty_author_name_e[1];
 
-            $new_item['author_profile'] = get_string_between($item, '<div class="persona_name"><a href="', '" data-miniprofile="');
+            $new_item['author_profile'] = get_string_between($item, '<div class="persona_name"><a href="http://steamcommunity.com/', '" data-miniprofile="');
 
             $dirty_author_number_of_games = get_string_between($item, '<div class="num_owned_games"><a href="', '</a></div>');
             $dirty_author_number_of_games_e = explode('">', $dirty_author_number_of_games);
@@ -900,7 +964,7 @@ class HtmlProcessing extends Core
             $new_item['author_number_of_reviews'] = end($dirty_author_number_of_reviews_e2);
 
             $dirty_author_avatar = get_string_between($item, '<div class="playerAvatar', '</div>');
-            $new_item['author_avatar'] = get_string_between($dirty_author_avatar, '<img src="', '" data-miniprofile="');
+            $new_item['author_avatar'] = get_string_between($dirty_author_avatar, '<img src="http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/', '" data-miniprofile="');
 
             $dirty_author_played = get_string_between($item, '<div class="hours">', '</div>');
             $dirty_author_played_e = explode(' ', $dirty_author_played);
