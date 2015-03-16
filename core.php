@@ -390,6 +390,10 @@ class Core extends Config
             elseif($link_segments[3] == 'id' || $link_segments[3] == 'profiles')
                 $resource_stats = SteamUserInfo::get_user_info_by_url($link);
 
+            /* Detect steam curator */
+            elseif($link_segments[3] == 'curator')
+                $resource_stats = SteamCurator::get_curator_info($link);
+
             else
             {
                 $resource_stats['type'] = 'undefined';
@@ -526,6 +530,24 @@ class YouTubeInfo extends Core
             $resource_stats = unserialize(base64_decode($query['items']));
 
         }
+
+        return $resource_stats;
+
+    }
+
+}
+
+class SteamCurator extends Core
+{
+
+    public function get_curator_info($link)
+    {
+
+        $link_segments = explode('/', $link);
+
+        $resource_stats['type'] = 'curator';
+        $resource_stats['link'] = $link;
+        $resource_stats['curator_id'] = $link_segments[4];
 
         return $resource_stats;
 
@@ -802,6 +824,8 @@ class HtmlProcessing extends Core
     public function detect_reviews_in_html($html)
     {
 
+        $config = $this->get_config();
+
         $reviews_explode = explode('<div class="review_box">', $html);
         unset($reviews_explode[0]);
 
@@ -951,7 +975,7 @@ class HtmlProcessing extends Core
             $dirty_author_name_e = explode('">', $dirty_author_name);
             $new_item['author_name'] = $dirty_author_name_e[1];
 
-            $new_item['author_profile'] = get_string_between($item, '<div class="persona_name"><a href="http://steamcommunity.com/', '" data-miniprofile="');
+            $new_item['author_profile'] = get_string_between($item, '<div class="persona_name"><a href="' . $config['profile_url_part'], '" data-miniprofile="');
 
             $dirty_author_number_of_games = get_string_between($item, '<div class="num_owned_games"><a href="', '</a></div>');
             $dirty_author_number_of_games_e = explode('">', $dirty_author_number_of_games);
@@ -964,7 +988,7 @@ class HtmlProcessing extends Core
             $new_item['author_number_of_reviews'] = end($dirty_author_number_of_reviews_e2);
 
             $dirty_author_avatar = get_string_between($item, '<div class="playerAvatar', '</div>');
-            $new_item['author_avatar'] = get_string_between($dirty_author_avatar, '<img src="http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/', '" data-miniprofile="');
+            $new_item['author_avatar'] = get_string_between($dirty_author_avatar, '<img src="' . $config['avatar_url_part'], '" data-miniprofile="');
 
             $dirty_author_played = get_string_between($item, '<div class="hours">', '</div>');
             $dirty_author_played_e = explode(' ', $dirty_author_played);
