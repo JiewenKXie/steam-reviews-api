@@ -3,17 +3,6 @@
 require('/config.php');
 require('/core.php');
 
-function get_link_segments($link)
-{
-
-    $link = str_replace("http://", "", $link);
-    $link = str_replace("https://", "", $link);
-    $link_array = explode('/', $link);
-
-    return $link_array;
-
-}
-
 class Cron extends Core
 {
 
@@ -45,13 +34,13 @@ class Cron extends Core
         foreach($form_array as $k => $item)
         {
 
-            $segments_array = get_link_segments($item['link']);
+            $segments_array = explode('/', $item['link']);
 
             /* detect user steam id */
-            if($segments_array[1] == 'id')
+            if($segments_array[0] == 'id')
             {
 
-                $try_get_user_id = $UrlContent->try_get_url_content("http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=" . $config['steam_web_api_key'] . "&vanityurl=" . $segments_array[2], 3);
+                $try_get_user_id = $UrlContent->try_get_url_content("http://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=" . $config['steam_web_api_key'] . "&vanityurl=" . $segments_array[1], 3);
                 $try_get_user_id = json_decode($try_get_user_id);
 
                 if(isset($try_get_user_id->response->success) && $try_get_user_id->response->success == 1)
@@ -60,8 +49,8 @@ class Cron extends Core
                     $user_id = false;
 
             }
-            if($segments_array[1] == 'profiles')
-                $user_id = $segments_array[2];
+            if($segments_array[0] == 'profiles')
+                $user_id = $segments_array[1];
 
             /* get steam profile by id */
             if(isset($user_id) && $user_id !== false)
@@ -84,7 +73,7 @@ class Cron extends Core
                         $form_array[$k]['profile_name'] = $info->response->players[0]->personaname;
 
                     if(isset($info->response->players[0]->avatar))
-                        $form_array[$k]['avatar'] = $info->response->players[0]->avatar;
+                        $form_array[$k]['avatar'] = str_replace($config['avatar_url_api_part'], "", $info->response->players[0]->avatar);
 
                     if(isset($info->response->players[0]->loccountrycode))
                         $form_array[$k]['lang'] = $info->response->players[0]->loccountrycode;

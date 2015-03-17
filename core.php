@@ -653,7 +653,7 @@ class Render extends Core
     public function render_xml($items, $item_name = 'review')
     {
 
-        $xml = new SimpleXMLElement('<xml/>');
+        $xml = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><xml/>');
 
         foreach($items as $item)
         {

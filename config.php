@@ -44,6 +44,7 @@ class Config
 
             /* Available avatars size */
             'avatar_url_part' => 'http://cdn.akamai.steamstatic.com/steamcommunity/public/images/avatars/',
+            'avatar_url_api_part' => 'https://steamcdn-a.akamaihd.net/steamcommunity/public/images/avatars/',
 
             'app_image_types' => array(
                 'small' => 'capsule_sm_120.jpg',
