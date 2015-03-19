@@ -910,15 +910,21 @@ class HtmlProcessing extends Core
                     'finish_what' => '</blockquote>',
                     'finish_than' => '[/bq]',
                     'tag_name' => 'blockquote'
+                ),
+
+                /* Lists */
+                'ul' => array(
+                    'start_what' => '<ul class="bb_ul">',
+                    'start_than' => '[ul]',
+                    'finish_what' => '</ul>',
+                    'finish_than' => '[/ul]',
+                    'tag_name' => 'ul'
                 )
 
             );
 
             foreach($replaces_tag_array as $conf)
                 $dirty_text = $HtmlProcessing->str_replace_tags($conf, $dirty_text);
-
-            $dirty_text = str_replace('<ul class="bb_ul">', "[ul]", $dirty_text);
-            $dirty_text = str_replace('</ul>', "[/ul]", $dirty_text);
 
             $dirty_text = str_replace('<li>', "[li]", $dirty_text);
             $dirty_text = str_replace('</li>', "[/li]", $dirty_text);
