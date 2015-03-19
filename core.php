@@ -1,6 +1,10 @@
 <?php
 
 /* HELPERS */
+
+/*
+ * Fast print_r array
+ */
 function overdie($array)
 {
 
@@ -12,6 +16,9 @@ function overdie($array)
 
 }
 
+/*
+ *  Shift dates
+ */
 function recalculate_date($date, $rec)
 {
 
@@ -19,6 +26,9 @@ function recalculate_date($date, $rec)
 
 }
 
+/*
+ * Getting values between two words in the text, for the first occurrence
+ */
 function get_string_between($string, $start, $end)
 {
 
@@ -31,6 +41,9 @@ function get_string_between($string, $start, $end)
 
 }
 
+/*
+ * Replacement function of unknown sequence of characters consisting of one template
+ */
 function str_replace_group($target, $replace_to, $string)
 {
 
@@ -39,7 +52,6 @@ function str_replace_group($target, $replace_to, $string)
     return $string;
 
 }
-
 
 /* CORE */
 class Core extends Config
@@ -824,6 +836,7 @@ class HtmlProcessing extends Core
     public function detect_reviews_in_html($html)
     {
 
+        $HtmlProcessing = new HtmlProcessing();
         $config = $this->get_config();
 
         $reviews_explode = explode('<div class="review_box">', $html);
@@ -848,17 +861,61 @@ class HtmlProcessing extends Core
             $dirty_text = str_replace("\r\n", "", $dirty_text);
 
             $dirty_text = trim($dirty_text);
-
-            $dirty_text = str_replace('<div class="bb_h1">', "[h1]", $dirty_text);
-            $dirty_text = str_replace('</div>', "[/h1]", $dirty_text);
-
             $dirty_text = str_replace('<div class="bb_code">', "", $dirty_text);
 
             $dirty_text = str_replace('<b>', "[b]", $dirty_text);
             $dirty_text = str_replace('</b>', "[/b]", $dirty_text);
 
-            $dirty_text = str_replace('<span class="bb_spoiler"><span>', "[spoiler]", $dirty_text);
-            $dirty_text = str_replace('</span></span>', "[/spoiler]", $dirty_text);
+            $replaces_tag_array = array(
+
+                'h1' => array(
+                    'start_what' => '<div class="bb_h1">',
+                    'start_than' => '[h1]',
+                    'finish_what' => '</div>',
+                    'finish_than' => '[/h1]',
+                    'tag_name' => 'div'
+                ),
+
+                /* Spoilers */
+                'spoiler' => array(
+                    'start_what' => '<span class="bb_spoiler">',
+                    'start_than' => '[spoiler]',
+                    'finish_what' => '</span>',
+                    'finish_than' => '[/spoiler]',
+                    'tag_name' => 'span'
+                ),
+
+                /* Strikethrough */
+                's' => array(
+                    'start_what' => '<span class="bb_strike">',
+                    'start_than' => '[s]',
+                    'finish_what' => '</span>',
+                    'finish_than' => '[/s]',
+                    'tag_name' => 'span'
+                ),
+
+                /* Remove empty spans */
+                'span' => array(
+                    'start_what' => '<span>',
+                    'start_than' => '',
+                    'finish_what' => '</span>',
+                    'finish_than' => '',
+                    'tag_name' => 'span'
+                ),
+
+                /* Quotations */
+                'blockquote' => array(
+                    'start_what' => '<blockquote class="bb_blockquote">',
+                    'start_than' => '[bq]',
+                    'finish_what' => '</blockquote>',
+                    'finish_than' => '[/bq]',
+                    'tag_name' => 'blockquote'
+                )
+
+            );
+
+            foreach($replaces_tag_array as $conf)
+                $dirty_text = $HtmlProcessing->str_replace_tags($conf, $dirty_text);
 
             $dirty_text = str_replace('<ul class="bb_ul">', "[ul]", $dirty_text);
             $dirty_text = str_replace('</ul>', "[/ul]", $dirty_text);
@@ -871,9 +928,6 @@ class HtmlProcessing extends Core
 
             $dirty_text = str_replace('<i>', "[i]", $dirty_text);
             $dirty_text = str_replace('</i>', "[/i]", $dirty_text);
-
-            $dirty_text = str_replace('<blockquote class="bb_blockquote">', "[bq]", $dirty_text);
-            $dirty_text = str_replace('</blockquote>', "[/bq]", $dirty_text);
 
             $dirty_text = str_replace('<br>', "[br]", $dirty_text);
 
@@ -999,6 +1053,169 @@ class HtmlProcessing extends Core
         }
 
         return $items;
+
+    }
+
+    /*
+     * Finding and replacing tags, excluding other tags in text
+     */
+    function str_replace_tags($conf, $text)
+    {
+
+        /* Tags management script */
+        if(isset($conf['start_what']) && isset($conf['start_than']))
+        {
+
+            $tag_count = substr_count($text, $conf['start_what']);
+
+            if($tag_count == 0)
+                return $text;
+            else
+            {
+
+                $split_text = explode($conf['start_what'], $text);
+
+                /* If !isset finish config tag */
+                if(!isset($conf['finish_what']) && !isset($conf['finish_than']))
+                    return implode($conf['start_than'], $split_text);
+                else
+                {
+                    /* If isset finish config tag */
+                    $detect_count_start_tag = substr_count($text, $conf['start_what']);
+                    $detect_count_finish_tag = substr_count($text, $conf['finish_what']);
+
+                    /* If number of start tag equal to number of finish tags  */
+                    if($detect_count_start_tag == $detect_count_finish_tag)
+                    {
+
+                        /* Direct replace and return */
+                        $text = str_replace($conf['start_what'], $conf['start_than'], $text);
+                        $text = str_replace($conf['finish_what'], $conf['finish_than'], $text);
+
+                        return $text;
+
+                    }
+                    else
+                    {
+
+                        /* Collect all tags string */
+                        $original_array = $this->convert_text_to_tags_array($conf['tag_name'], $text);
+
+                        if(!empty($original_array))
+                        {
+
+                            /* Duplicate tags array */
+                            $replaced_array = $original_array;
+
+                            /* Replacing relevant tags to template */
+                            foreach($replaced_array as $tag_name => $tag_value)
+                            {
+
+                                $detect_count_start_tag = substr_count($tag_value, $conf['start_what']);
+
+                                if($detect_count_start_tag == 1)
+                                {
+
+                                    $replaced_array[$tag_name] = str_replace($conf['start_what'], $conf['start_than'], $tag_value);
+                                    $replaced_array[$tag_name] = str_replace($conf['finish_what'], $conf['finish_than'], $replaced_array[$tag_name]);
+
+                                }
+
+                            }
+
+                            /* Combination of template and original */
+                            foreach($replaced_array as $tag_name => $tag_value)
+                            {
+
+                                foreach($replaced_array as $t_name => $t_value)
+                                {
+                                    if(substr_count($tag_value, $t_name) > 0)
+                                        $replaced_array[$tag_name] = str_replace('[' . $t_name . ']', $t_value, $replaced_array[$tag_name]);
+
+                                }
+
+                                foreach($original_array as $t_name => $t_value)
+                                {
+                                    if(substr_count($tag_value, $t_name) > 0)
+                                        $original_array[$tag_name] = str_replace('[' . $t_name . ']', $t_value, $original_array[$tag_name]);
+                                }
+
+                            }
+
+                            /* Duplicate of original text */
+                            $converted_text = $text;
+                            $replaced_array = array_reverse($replaced_array);
+
+                            /* Replace in text */
+                            foreach($replaced_array as $tag_name => $tag_value)
+                            {
+
+                                if($tag_value !== $original_array[$tag_name])
+                                    $converted_text = str_replace($original_array[$tag_name], $tag_value, $converted_text);
+
+                            }
+
+                            return $converted_text;
+
+                        }
+                        else
+                            return $text;
+
+                    }
+
+                }
+
+            }
+
+        }
+        else
+            return false;
+
+    }
+
+    /*
+     * The search function tags in the text, and transform them into an array
+     */
+    function convert_text_to_tags_array($tag, $text, $collected_tags = array(), $counter = 1)
+    {
+
+        /* Detect tags value */
+        $detect_count_start_tag = substr_count($text, '<' . $tag);
+
+        /* If the tag is not present, the accumulated return array */
+        if($detect_count_start_tag == 0)
+            return $collected_tags;
+        else
+        {
+
+            /* Splitting text by open tags */
+            $split_by_open_tag = explode('<' . $tag, $text);
+
+            foreach($split_by_open_tag as $item)
+            {
+
+                $tag_count = substr_count($item, '</' . $tag);
+
+                /* If in array element exists closing tags, verifies and processes */
+                if($tag_count > 0)
+                {
+
+                    $set_tag = '<' . $tag . $item;
+                    $clear = '<' . $tag . get_string_between($set_tag, '<' . $tag, '</' . $tag) . '</' . $tag . '>';
+
+                    if(!in_array($clear, $collected_tags))
+                        $collected_tags['tag_' . $counter] = $clear;
+
+                    $text = str_replace($clear, '[tag_' . $counter . ']', $text);
+
+                    $counter++;
+
+                }
+
+            }
+
+            return $this->convert_text_to_tags_array($tag, $text, $collected_tags, $counter);
+        }
 
     }
 

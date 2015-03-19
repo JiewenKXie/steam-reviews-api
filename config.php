@@ -2,6 +2,7 @@
 
 /* apache change request time */
 ini_set('max_execution_time', 300);
+//ini_set('memory_limit', '-1');
 
 /* hide all php errors */
 //error_reporting(0);
