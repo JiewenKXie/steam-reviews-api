@@ -780,15 +780,46 @@ class SteamSharedFiles extends Core
 
         $file_id = $detect_file_id[1];
 
-        $try_cache = $this->mysql_connect->query("SELECT `id`, `file_type`, `direct_url`, `filled`, `game` FROM (`shared_files_cache`) WHERE `id` = '" . $file_id . "'");
+        $try_cache = $this->mysql_connect->query("SELECT `id`, `file_type`, `direct_url`, `title`, `filled` FROM (`shared_files_cache`) WHERE `id` = '" . $file_id . "'");
 
+        /* if new resource */
         if(mysqli_num_rows($try_cache) == 0)
-            $this->mysql_connect->query("INSERT INTO `shared_files_cache` (`id`, `filled`) VALUES ('" . $file_id . "', 0);");
+        {
+
+            /* get url steam_file content */
+            $resource = SteamSharedFiles::detect_steam_file($link);
+
+            if(!empty($resource))
+            {
+                $resource['id'] = $file_id;
+
+                $resource_stats = array_merge($resource_stats, $resource);
+
+                $first_part = array();
+                $second_part = array();
+                foreach($resource as $row => $value)
+                {
+                    $first_part[] = $row;
+                    $second_part[] = $value;
+                }
+
+                $this->mysql_connect->query("INSERT INTO `shared_files_cache` (`" . implode('`, `', $first_part) . "`) VALUES ('" . implode("', '", $second_part) . "');");
+
+                unset($resource_stats['filled']);
+
+            }
+            else
+                /* if impossible detect resource, set empty value */
+                $this->mysql_connect->query("INSERT INTO `shared_files_cache` (`id`, `filled`) VALUES ('" . $file_id . "', 0);");
+
+
+        }
         else
         {
 
             $cache_value = $try_cache->fetch_assoc();
 
+            /* if already in db */
             if($cache_value['filled'] == 1)
             {
 
@@ -803,6 +834,35 @@ class SteamSharedFiles extends Core
         }
 
         return $resource_stats;
+
+    }
+
+    private function detect_steam_file($link)
+    {
+
+        $UrlContent = new UrlContent();
+        $html = $UrlContent->try_get_url_content($link);
+
+        $return_array = array();
+
+        /* detect steam images */
+        if(substr_count($html, '<img id="ActualMedia" class="artPreviewImage"') == 1)
+        {
+            $return_array['file_type'] = 'image';
+            $return_array['title'] = get_string_between($html, '<div class="workshopItemTitle">', '</div>');
+            $return_array['direct_url'] = get_string_between($html, '<img id="ActualMedia" class="artPreviewImage" src="', '" width="');
+            $return_array['filled'] = 1;
+        }
+        /* detect steam screen */
+        elseif(substr_count($html, '<img id="ActualMedia" class="screenshotEnlargeable"') == 1)
+        {
+            $return_array['file_type'] = 'screen';
+            $return_array['game'] = get_string_between($html, '<div class="apphub_AppName ellipsis">', '</div>');
+            $return_array['direct_url'] = get_string_between($html, '<img id="ActualMedia" class="screenshotEnlargeable" src="', '" width="');
+            $return_array['filled'] = 1;
+        }
+
+        return $return_array;
 
     }
 
@@ -1065,7 +1125,7 @@ class HtmlProcessing extends Core
     /*
      * Finding and replacing tags, excluding other tags in text
      */
-    function str_replace_tags($conf, $text)
+    public function str_replace_tags($conf, $text)
     {
 
         /* Tags management script */
@@ -1182,7 +1242,7 @@ class HtmlProcessing extends Core
     /*
      * The search function tags in the text, and transform them into an array
      */
-    function convert_text_to_tags_array($tag, $text, $collected_tags = array(), $counter = 1)
+    public function convert_text_to_tags_array($tag, $text, $collected_tags = array(), $counter = 1)
     {
 
         /* Detect tags value */

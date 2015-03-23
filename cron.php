@@ -15,6 +15,13 @@ class Cron extends Core
         $this->collection_users_in_cache();
         $this->collection_data_users();
 
+        $this->collection_steam_file();
+
+    }
+
+    private function collection_steam_file()
+    {
+
     }
 
     private function collection_data_users()
