@@ -1037,7 +1037,8 @@ class HtmlProcessing extends Core
                             $new_item['resources']['resource_' . $resource_counter] = $this->detect_resource($detect_link);
 
                             /* cap link */
-                            $dirty_text = str_replace('<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . $dynamiclink_value . '">' . $detect_link . '</a>', "[resource_" . $resource_counter . "]", $dirty_text);
+                            $resource_title = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . $dynamiclink_value . '">', '</a>');
+                            $dirty_text = str_replace('<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . $dynamiclink_value . '">' . $resource_title . '</a>', "[resource_" . $resource_counter . "]", $dirty_text);
 
                             $resource_counter++;
 
@@ -1052,8 +1053,8 @@ class HtmlProcessing extends Core
                             $new_item['resources']['resource_' . $resource_counter] = $this->detect_resource($detect_link);
 
                             /* cap link */
-                            $dirty_text = str_replace('<a class="bb_link" target="_blank" href="' . $detect_link . '" >' . $detect_link . '</a>', "[resource_" . $resource_counter . "]", $dirty_text);
-
+                            $resource_title = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="' . $detect_link . '" >', '</a>');
+                            $dirty_text = str_replace('<a class="bb_link" target="_blank" href="' . $detect_link . '" >' . $resource_title . '</a>', "[resource_" . $resource_counter . "]", $dirty_text);
                             $resource_counter++;
 
                         }
