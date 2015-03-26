@@ -59,7 +59,9 @@ function str_replace_group($target, $replace_to, $string)
  */
 class DB
 {
+
     public static $conn;
+
 }
 
 /* CORE */
@@ -476,9 +478,54 @@ class YouTubeInfo extends Core
 
     public function get_youtube_info($link)
     {
+
         $resource_stats = array('type' => 'youtube', 'link' => $link);
 
-        $video_ID = preg_replace('~
+        $video_id = $this->detect_video_id($link);
+
+        $try_cache = DB::$conn->query("SELECT `items` FROM (`youtube_cache`) WHERE `link` = '" . $video_id . "'");
+
+        if(mysqli_num_rows($try_cache) == 0)
+        {
+
+            $JSON = @file_get_contents("https://gdata.youtube.com/feeds/api/videos/{$video_id}?v=2&alt=json");
+
+            if($JSON === FALSE)
+                $resource_stats['error'] = 'Wrong video id';
+            else
+            {
+
+                $JSON_Data = json_decode($JSON);
+
+                $resource_stats['views'] = $JSON_Data->{'entry'}->{'yt$statistics'}->{'viewCount'};
+                $resource_stats['author'] = $JSON_Data->{'entry'}->{'author'}[0]->name->{'$t'};
+                $resource_stats['title'] = $JSON_Data->{'entry'}->{'title'}->{'$t'};
+                $resource_stats['thumbnail'] = 'http://img.youtube.com/vi/' . $video_id . '/default.jpg';
+                //$resource_stats['description'] = $JSON_Data->{'entry'}->{'media$group'}->{'media$description'}->{'$t'};
+                $resource_stats['time'] = gmdate("H:i:s", (int)$JSON_Data->{'entry'}->{'media$group'}->{'media$content'}[0]->duration);
+
+                DB::$conn->query("INSERT INTO `youtube_cache` (`link`, `items`, `datetime`) VALUES ('" . $video_id . "', '" . base64_encode(serialize($resource_stats)) . "', '" . date('Y-m-d H:i:s') . "');");
+
+            }
+
+
+        }
+        else
+        {
+
+            $query = $try_cache->fetch_assoc();
+            $resource_stats = unserialize(base64_decode($query['items']));
+
+        }
+
+        return $resource_stats;
+
+    }
+
+    private function detect_video_id($link)
+    {
+
+        return preg_replace('~
             # Match non-linked youtube URL in the wild. (Rev:20130823)
             https?://         # Required scheme. Either http or https.
             (?:[0-9A-Z-]+\.)? # Optional subdomain.
@@ -504,48 +551,6 @@ class YouTubeInfo extends Core
             '$1',
             $link);
 
-
-        $try_cache = DB::$conn->query("SELECT `items` FROM (`youtube_cache`) WHERE `link` = '" . $video_ID . "'");
-
-        if(mysqli_num_rows($try_cache) == 0)
-        {
-
-            $JSON = @file_get_contents("https://gdata.youtube.com/feeds/api/videos/{$video_ID}?v=2&alt=json");
-
-            if($JSON === FALSE)
-            {
-
-                $resource_stats['error'] = 'Wrong video id';
-
-            }
-            else
-            {
-
-                $JSON_Data = json_decode($JSON);
-
-                $resource_stats['views'] = $JSON_Data->{'entry'}->{'yt$statistics'}->{'viewCount'};
-                $resource_stats['author'] = $JSON_Data->{'entry'}->{'author'}[0]->name->{'$t'};
-                $resource_stats['title'] = $JSON_Data->{'entry'}->{'title'}->{'$t'};
-                $resource_stats['thumbnail'] = 'http://img.youtube.com/vi/' . $video_ID . '/default.jpg';
-                //$resource_stats['description'] = $JSON_Data->{'entry'}->{'media$group'}->{'media$description'}->{'$t'};
-                $resource_stats['time'] = gmdate("H:i:s", (int)$JSON_Data->{'entry'}->{'media$group'}->{'media$content'}[0]->duration);
-
-                DB::$conn->query("INSERT INTO `youtube_cache` (`link`, `items`, `datetime`) VALUES ('" . $video_ID . "', '" . base64_encode(serialize($resource_stats)) . "', '" . date('Y-m-d H:i:s') . "');");
-
-            }
-
-
-        }
-        else
-        {
-
-            $query = $try_cache->fetch_assoc();
-            $resource_stats = unserialize(base64_decode($query['items']));
-
-        }
-
-        return $resource_stats;
-
     }
 
 }
@@ -561,6 +566,38 @@ class SteamCurator extends Core
         $resource_stats['type'] = 'curator';
         $resource_stats['link'] = $link;
         $resource_stats['curator_id'] = $link_segments[4];
+
+        return $resource_stats;
+
+    }
+
+}
+
+class SteamExternalLink extends Core
+{
+
+    public function get_direct_link($link)
+    {
+
+        $resource_stats = array();
+
+        $detect_real_link = explode('?url=', $link);
+
+        $resource_stats['type'] = 'external link';
+        $resource_stats['direct_link'] = mb_strtolower($detect_real_link[1]);
+
+        $detect_domain = str_replace("http://", "", mb_strtolower($detect_real_link[1]));
+        $detect_domain = str_replace("https://", "", $detect_domain);
+
+        if(substr_count($detect_domain, '/') > 0)
+        {
+
+            $segments = explode('/', $detect_domain);
+            $detect_domain = $segments[0];
+
+        }
+
+        $resource_stats['domain_name'] = $detect_domain;
 
         return $resource_stats;
 
@@ -792,12 +829,14 @@ class SteamSharedFiles extends Core
 
             if(!empty($resource))
             {
+
                 $resource['id'] = $file_id;
 
                 $resource_stats = array_merge($resource_stats, $resource);
 
                 $first_part = array();
                 $second_part = array();
+
                 foreach($resource as $row => $value)
                 {
                     $first_part[] = $row;
@@ -1010,6 +1049,7 @@ class HtmlProcessing extends Core
             {
 
                 $resource_counter = 1;
+
                 /* explode text by links */
                 $resources_array = explode('<a class="bb_link" ', $dirty_text);
                 unset($resources_array[0]);
@@ -1038,7 +1078,9 @@ class HtmlProcessing extends Core
 
                             /* cap link */
                             $resource_title = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . $dynamiclink_value . '">', '</a>');
-                            $dirty_text = str_replace('<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . $dynamiclink_value . '">' . $resource_title . '</a>', "[resource_" . $resource_counter . "]", $dirty_text);
+
+                            $changeable_code = '<a class="bb_link" target="_blank" href="' . $detect_link . '"  id="dynamiclink_' . $dynamiclink_value . '">' . $resource_title . '</a>';
+                            $dirty_text = str_replace($changeable_code, "[resource_" . $resource_counter . "]", $dirty_text);
 
                             $resource_counter++;
 
@@ -1054,7 +1096,10 @@ class HtmlProcessing extends Core
 
                             /* cap link */
                             $resource_title = get_string_between($dirty_text, '<a class="bb_link" target="_blank" href="' . $detect_link . '" >', '</a>');
-                            $dirty_text = str_replace('<a class="bb_link" target="_blank" href="' . $detect_link . '" >' . $resource_title . '</a>', "[resource_" . $resource_counter . "]", $dirty_text);
+
+                            $changeable_code = '<a class="bb_link" target="_blank" href="' . $detect_link . '" >' . $resource_title . '</a>';
+                            $dirty_text = str_replace($changeable_code, "[resource_" . $resource_counter . "]", $dirty_text);
+
                             $resource_counter++;
 
                         }
@@ -1147,6 +1192,7 @@ class HtmlProcessing extends Core
             $SteamSharedFiles = new SteamSharedFiles();
             $SteamUserInfo = new SteamUserInfo();
             $SteamCurator = new SteamCurator();
+            $SteamExternalLink = new SteamExternalLink();
 
             /* Detect shared steam resources */
             if($link_segments[3] == 'sharedfiles')
@@ -1159,6 +1205,9 @@ class HtmlProcessing extends Core
             /* Detect steam curator */
             elseif($link_segments[3] == 'curator')
                 $resource_stats = $SteamCurator->get_curator_info($link);
+
+            elseif($link_segments[3] == 'linkfilter')
+                $resource_stats = $SteamExternalLink->get_direct_link($link);
 
             else
             {
@@ -1196,6 +1245,7 @@ class HtmlProcessing extends Core
                     return implode($conf['start_than'], $split_text);
                 else
                 {
+
                     /* If isset finish config tag */
                     $detect_count_start_tag = substr_count($text, $conf['start_what']);
                     $detect_count_finish_tag = substr_count($text, $conf['finish_what']);
@@ -1231,10 +1281,8 @@ class HtmlProcessing extends Core
 
                                 if($detect_count_start_tag == 1)
                                 {
-
                                     $replaced_array[$tag_name] = str_replace($conf['start_what'], $conf['start_than'], $tag_value);
                                     $replaced_array[$tag_name] = str_replace($conf['finish_what'], $conf['finish_than'], $replaced_array[$tag_name]);
-
                                 }
 
                             }
@@ -1247,7 +1295,6 @@ class HtmlProcessing extends Core
                                 {
                                     if(substr_count($tag_value, $t_name) > 0)
                                         $replaced_array[$tag_name] = str_replace('[' . $t_name . ']', $t_value, $replaced_array[$tag_name]);
-
                                 }
 
                                 foreach($original_array as $t_name => $t_value)
