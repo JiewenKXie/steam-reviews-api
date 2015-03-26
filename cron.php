@@ -15,13 +15,6 @@ class Cron extends Core
         $this->collection_users_in_cache();
         $this->collection_data_users();
 
-        $this->collection_steam_file();
-
-    }
-
-    private function collection_steam_file()
-    {
-
     }
 
     private function collection_data_users()
@@ -30,7 +23,7 @@ class Cron extends Core
         $UrlContent = new UrlContent();
         $config = $this->get_config();
 
-        $try_cache = $this->mysql_connect->query("SELECT `link`, `profile_id`, `profile_name`, `real_name`, `avatar`, `lang`, `filled` FROM (`users_cache`) WHERE `filled` = '0'");
+        $try_cache = DB::$conn->query("SELECT `link`, `profile_id`, `profile_name`, `real_name`, `avatar`, `lang`, `filled` FROM (`users_cache`) WHERE `filled` = '0'");
 
         $form_array = array();
         while ($row = $try_cache->fetch_assoc()){
@@ -103,7 +96,7 @@ class Cron extends Core
 
                     }
 
-                    $this->mysql_connect->query("UPDATE `users_cache` SET " . $gen_query . " WHERE `link` = '" . $item['link'] . "'");
+                    DB::$conn->query("UPDATE `users_cache` SET " . $gen_query . " WHERE `link` = '" . $item['link'] . "'");
 
                 }
 
@@ -117,7 +110,7 @@ class Cron extends Core
     {
 
         /* Get current users cache */
-        $try_cache = $this->mysql_connect->query("SELECT `link` FROM (`users_cache`)");
+        $try_cache = DB::$conn->query("SELECT `link` FROM (`users_cache`)");
 
         $form_array = array();
         while ($row = $try_cache->fetch_assoc()){
@@ -129,7 +122,7 @@ class Cron extends Core
             $user_cache[] = $link['link'];
 
         /* Users from reviews cache */
-        $try_reviews_cache = $this->mysql_connect->query("SELECT `items` FROM (`reviews_cache`)");
+        $try_reviews_cache = DB::$conn->query("SELECT `items` FROM (`reviews_cache`)");
 
         $form_reviews_array = array();
         while ($row = $try_reviews_cache->fetch_assoc()){
@@ -180,7 +173,7 @@ class Cron extends Core
         if(!empty($formation_insert_query))
         {
             $formation_query_values = implode(',', $formation_insert_query);
-            $this->mysql_connect->query("INSERT INTO `users_cache` (`link`, `profile_name`, `avatar`, `filled`, `datetime`) VALUES " . $formation_query_values);
+            DB::$conn->query("INSERT INTO `users_cache` (`link`, `profile_name`, `avatar`, `filled`, `datetime`) VALUES " . $formation_query_values);
         }
 
     }
@@ -192,7 +185,7 @@ class Cron extends Core
         $config = $this->get_config();
 
         /* Get dates steam users from base */
-        $try_cache = $this->mysql_connect->query("SELECT `link`, `datetime` FROM (`users_cache`)");
+        $try_cache = DB::$conn->query("SELECT `link`, `datetime` FROM (`users_cache`)");
 
         $form_array = array();
         while ($row = $try_cache->fetch_assoc()){
@@ -222,14 +215,16 @@ class Cron extends Core
 
         $where_part = implode(' OR ', $pre_mysql_form);
 
-        $this->mysql_connect->query("UPDATE `users_cache` SET `datetime` = '" . date('Y-m-d H:i:s') . "', `filled` = '0' WHERE " . $where_part);
+        DB::$conn->query("UPDATE `users_cache` SET `datetime` = '" . date('Y-m-d H:i:s') . "', `filled` = '0' WHERE " . $where_part);
 
     }
 
 }
 
 $ip = $_SERVER['REMOTE_ADDR'];
-$config = Config::get_config();
+
+$Conf = new Config();
+$config = $Conf->get_config();
 
 if(in_array($ip, $config['cron_access_ip']))
 {

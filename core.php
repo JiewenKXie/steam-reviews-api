@@ -53,21 +53,27 @@ function str_replace_group($target, $replace_to, $string)
 
 }
 
+/*
+ * Static DB connection
+ * Keeps a connection to MySQL
+ */
+class DB
+{
+    public static $conn;
+}
+
 /* CORE */
 class Core extends Config
 {
 
     /* MYSQL */
-    public $mysql_connect = false;
-
     public function do_mysql_connect()
     {
 
         $config = $this->get_config();
+        DB::$conn = @mysqli_connect($config['db_host'],$config['db_user'],$config['db_pass'],$config['db_database']);
 
-        $this->mysql_connect = @mysqli_connect($config['db_host'],$config['db_user'],$config['db_pass'],$config['db_database']);
-
-        if (!$this->mysql_connect)
+        if (!DB::$conn)
             die('db connect error');
         else
             return true;
@@ -77,10 +83,13 @@ class Core extends Config
     public function close_mysql_connect()
     {
 
-        mysqli_close($this->mysql_connect);
+        mysqli_close(DB::$conn);
 
     }
 
+    /*
+     * Checks number of requests from the same IP
+     */
     public function check_request_limit()
     {
 
@@ -88,23 +97,20 @@ class Core extends Config
 
         $ip = $_SERVER['REMOTE_ADDR'];
 
-        $dirt_result = $this->mysql_connect->query("SELECT * FROM request_limit WHERE ip='" . $ip . "' ORDER BY id DESC");
+        //Current number of requests
+        $dirt_result = DB::$conn->query("SELECT * FROM request_limit WHERE ip='" . $ip . "' ORDER BY id DESC");
         $result = $dirt_result->fetch_assoc();
 
         //if not found
         if($result == false)
-        {
-
-            $this->mysql_connect->query("INSERT INTO `request_limit` (`ip`, `count`, `datetime`) VALUES ('" . $ip . "', 1, '" . date('Y-m-d H:i:s') . "')");
-
-        }
+            DB::$conn->query("INSERT INTO `request_limit` (`ip`, `count`, `datetime`) VALUES ('" . $ip . "', 1, '" . date('Y-m-d H:i:s') . "')");
 
         //if it exists, but expired
         elseif($result['datetime'] < recalculate_date(date('Y-m-d H:i:s'), '-' . $config['request_limit_time_in_minutes']))
         {
 
-            $this->mysql_connect->query("DELETE FROM `request_limit` WHERE `ip` = '" . $ip . "'");
-            $this->mysql_connect->query("INSERT INTO `request_limit` (`ip`, `count`, `datetime`) VALUES ('" . $ip . "', 1, '" . date('Y-m-d H:i:s') . "')");
+            DB::$conn->query("DELETE FROM `request_limit` WHERE `ip` = '" . $ip . "'");
+            DB::$conn->query("INSERT INTO `request_limit` (`ip`, `count`, `datetime`) VALUES ('" . $ip . "', 1, '" . date('Y-m-d H:i:s') . "')");
 
         }
 
@@ -118,12 +124,15 @@ class Core extends Config
             if($count >= $config['count_request_limit'])
                 die('Exceeded the query limit. The limit is reset at ' . recalculate_date($result['datetime'], '+' . $config['request_limit_time_in_minutes']));
 
-            $this->mysql_connect->query("UPDATE `request_limit` SET `count` = " . $count . " WHERE `id` = " . $result['id']);
+            DB::$conn->query("UPDATE `request_limit` SET `count` = " . $count . " WHERE `id` = " . $result['id']);
 
         }
 
     }
 
+    /*
+     * Checking GET parameters
+     */
     public function get_query_validate()
     {
 
@@ -148,12 +157,15 @@ class Core extends Config
 
     }
 
+    /*
+     * Search cached reviews
+     */
     public function get_reviews()
     {
 
         $config = $this->get_config();
 
-        $dirt_result = $this->mysql_connect->query("SELECT `id`, `datetime`, `items` FROM (`reviews_cache`) WHERE `app` = '" . $_GET['app'] . "' AND `offset` = '" . $_GET['offset'] . "' AND `filter` = '" . $_GET['filter'] . "' AND `day_range` = '" . $_GET['day_range'] . "' AND `language` = '" . $_GET['language'] . "' ORDER BY id DESC");
+        $dirt_result = DB::$conn->query("SELECT `id`, `datetime`, `items` FROM (`reviews_cache`) WHERE `app` = '" . $_GET['app'] . "' AND `offset` = '" . $_GET['offset'] . "' AND `filter` = '" . $_GET['filter'] . "' AND `day_range` = '" . $_GET['day_range'] . "' AND `language` = '" . $_GET['language'] . "' ORDER BY id DESC");
         $result = $dirt_result->fetch_assoc();
 
         //if not found
@@ -167,7 +179,7 @@ class Core extends Config
                 $serialize_items = base64_encode(serialize($items));
                 $safe_serialize_items = mysql_real_escape_string($serialize_items);
 
-                $this->mysql_connect->query("INSERT INTO `reviews_cache` (`app`, `offset`, `filter`, `language`, `datetime`, `items`, `day_range`) VALUES ('" . $_GET['app'] . "', '" . $_GET['offset'] . "', '" . $_GET['filter'] . "', '" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $safe_serialize_items . "', '" . $_GET['day_range'] . "')");
+                DB::$conn->query("INSERT INTO `reviews_cache` (`app`, `offset`, `filter`, `language`, `datetime`, `items`, `day_range`) VALUES ('" . $_GET['app'] . "', '" . $_GET['offset'] . "', '" . $_GET['filter'] . "', '" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $safe_serialize_items . "', '" . $_GET['day_range'] . "')");
             }
 
             return $items;
@@ -185,8 +197,8 @@ class Core extends Config
                 $serialize_items = base64_encode(serialize($items));
                 $safe_serialize_items = mysql_real_escape_string($serialize_items);
 
-                $this->mysql_connect->query("DELETE FROM `reviews_cache` WHERE `app` = '" . $_GET['app'] . "' AND `offset` = '" . $_GET['offset'] . "' AND `filter` = '" . $_GET['filter'] . "' AND `day_range` = '" . $_GET['day_range'] . "' AND `language` = '" . $_GET['language'] . "'");
-                $this->mysql_connect->query("INSERT INTO `reviews_cache` (`app`, `offset`, `filter`, `language`, `datetime`, `items`, `day_range`) VALUES ('" . $_GET['app'] . "', '" . $_GET['offset'] . "', '" . $_GET['filter'] . "', '" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $safe_serialize_items . "', '" . $_GET['day_range'] . "')");
+                DB::$conn->query("DELETE FROM `reviews_cache` WHERE `app` = '" . $_GET['app'] . "' AND `offset` = '" . $_GET['offset'] . "' AND `filter` = '" . $_GET['filter'] . "' AND `day_range` = '" . $_GET['day_range'] . "' AND `language` = '" . $_GET['language'] . "'");
+                DB::$conn->query("INSERT INTO `reviews_cache` (`app`, `offset`, `filter`, `language`, `datetime`, `items`, `day_range`) VALUES ('" . $_GET['app'] . "', '" . $_GET['offset'] . "', '" . $_GET['filter'] . "', '" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $safe_serialize_items . "', '" . $_GET['day_range'] . "')");
             }
             return $items;
 
@@ -196,29 +208,18 @@ class Core extends Config
         else
         {
 
-            $dirt_result = $this->mysql_connect->query("SELECT `items` FROM (`reviews_cache`) WHERE `app` = '" . $_GET['app'] . "' AND `offset` = '" . $_GET['offset'] . "' AND `filter` = '" . $_GET['filter'] . "' AND `day_range` = '" . $_GET['day_range'] . "' AND `language` = '" . $_GET['language'] . "' ORDER BY id DESC");
+            $dirt_result = DB::$conn->query("SELECT `items` FROM (`reviews_cache`) WHERE `app` = '" . $_GET['app'] . "' AND `offset` = '" . $_GET['offset'] . "' AND `filter` = '" . $_GET['filter'] . "' AND `day_range` = '" . $_GET['day_range'] . "' AND `language` = '" . $_GET['language'] . "' ORDER BY id DESC");
             $result = $dirt_result->fetch_assoc();
 
             return unserialize(base64_decode($result['items']));
+
         }
 
     }
 
-    public function get_reviews_from_steam()
-    {
-
-        $UrlContent = new UrlContent();
-
-        $url = 'http://store.steampowered.com/appreviews/' . $_GET['app'] . '?start_offset=' . $_GET['offset'] . '&day_range=' . $_GET['day_range'] . '&filter=' . $_GET['filter'] . '&language=' . $_GET['language'];
-        $steam_json = json_decode($UrlContent->try_get_url_content($url));
-
-        if($steam_json->success !== 1)
-            die('App not found');
-
-        return HtmlProcessing::detect_reviews_in_html($steam_json->html);
-
-    }
-
+    /*
+     * Checking GET parameters
+     */
     public function get_search_query_validate()
     {
 
@@ -232,6 +233,9 @@ class Core extends Config
 
     }
 
+    /*
+     * Displaying results
+     */
     public function render($items, $item_name = 'review')
     {
 
@@ -262,12 +266,15 @@ class Core extends Config
 
     }
 
+    /*
+     * Search results in the cache
+     */
     public function get_search()
     {
 
         $config = $this->get_config();
 
-        $dirt_result = $this->mysql_connect->query("SELECT `id`, `datetime`, `items` FROM (`search_cache`) WHERE `language` = '" . $_GET['language'] . "' AND `search` = '" . $_GET['term'] . "' ORDER BY id DESC");
+        $dirt_result = DB::$conn->query("SELECT `id`, `datetime`, `items` FROM (`search_cache`) WHERE `language` = '" . $_GET['language'] . "' AND `search` = '" . $_GET['term'] . "' ORDER BY id DESC");
         $result = $dirt_result->fetch_assoc();
 
         //if not found
@@ -282,7 +289,7 @@ class Core extends Config
                 $serialize_items = base64_encode(serialize($items));
                 $safe_serialize_items = mysql_real_escape_string($serialize_items);
 
-                $this->mysql_connect->query("INSERT INTO `search_cache` (`language`, `datetime`, `search`, `items`) VALUES ('" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $_GET['term'] . "', '" . $safe_serialize_items . "')");
+                DB::$conn->query("INSERT INTO `search_cache` (`language`, `datetime`, `search`, `items`) VALUES ('" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $_GET['term'] . "', '" . $safe_serialize_items . "')");
             }
             return $items;
 
@@ -300,8 +307,8 @@ class Core extends Config
                 $serialize_items = base64_encode(serialize($items));
                 $safe_serialize_items = mysql_real_escape_string($serialize_items);
 
-                $this->mysql_connect->query("DELETE FROM `search_cache` WHERE `language` = '" . $_GET['language'] . "' AND `search` = '" . $_GET['term'] . "'");
-                $this->mysql_connect->query("INSERT INTO `search_cache` (`language`, `datetime`, `search`, `items`) VALUES ('" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $_GET['term'] . "', '" . $safe_serialize_items . "')");
+                DB::$conn->query("DELETE FROM `search_cache` WHERE `language` = '" . $_GET['language'] . "' AND `search` = '" . $_GET['term'] . "'");
+                DB::$conn->query("INSERT INTO `search_cache` (`language`, `datetime`, `search`, `items`) VALUES ('" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $_GET['term'] . "', '" . $safe_serialize_items . "')");
             }
             return $items;
 
@@ -310,7 +317,7 @@ class Core extends Config
         //if cache isset
         else
         {
-            $dirt_result = $this->mysql_connect->query("SELECT `id`, `datetime`, `items` FROM (`search_cache`) WHERE `language` = '" . $_GET['language'] . "' AND `search` = '" . $_GET['term'] . "' ORDER BY id DESC");
+            $dirt_result = DB::$conn->query("SELECT `id`, `datetime`, `items` FROM (`search_cache`) WHERE `language` = '" . $_GET['language'] . "' AND `search` = '" . $_GET['term'] . "' ORDER BY id DESC");
             $result = $dirt_result->fetch_assoc();
             $final_array = unserialize(base64_decode($result['items']));
 
@@ -320,104 +327,9 @@ class Core extends Config
 
     }
 
-    public function cache_search_app_items($array)
-    {
-
-        if(empty($array))
-            return false;
-
-        $generate_where_query = '';
-
-        foreach($array as $item)
-        {
-
-            if(end($array) == $item)
-                $generate_where_query = $generate_where_query . "`app_id` = '" . $item['app_id'] . "'";
-            else
-                $generate_where_query = $generate_where_query . "`app_id` = '" . $item['app_id'] . "' OR ";
-
-        }
-
-        $dirt_result = $this->mysql_connect->query("SELECT `app_id` FROM (`apps_list`) WHERE (" . $generate_where_query . ")");
-
-        $remove_id_list = array();
-        while ($row = $dirt_result->fetch_assoc()) {
-            $remove_id_list[] = $row['app_id'];
-        }
-
-        foreach($array as $k => $v)
-        {
-
-            if(in_array($v['app_id'], $remove_id_list))
-                unset($array[$k]);
-
-        }
-
-        $generate_insert_query = array();
-
-        foreach($array as $item)
-            $generate_insert_query[] = "('" . $item['app_id'] .  "', '" . mysql_real_escape_string($item['name']) . "')";
-
-        $insert_values_string = implode(', ', $generate_insert_query);
-
-        $this->mysql_connect->query("INSERT INTO `apps_list` (`app_id`, `name`) VALUES " . $insert_values_string . ";");
-
-    }
-
-    public function get_search_result_from_steam()
-    {
-
-        $config = $this->get_config();
-        $UrlContent = new UrlContent();
-
-        $url = 'http://store.steampowered.com/search/suggest?term=' . urlencode($_GET['term']) . '&f=games&cc=' . mb_strtoupper($config['language_header_components'][$_GET['language']]['header']) . '&l=' . $config['language_header_components'][$_GET['language']]['cookie'];
-        $steam_html = $UrlContent->try_get_url_content($url);
-
-        return HtmlProcessing::detect_search_result_in_html($steam_html);
-
-    }
-
-    public function detect_resource($link)
-    {
-
-
-        if(substr_count($link, 'youtube') > 0)
-        {
-
-            $resource_stats = YouTubeInfo::get_youtube_info($link);
-            return $resource_stats;
-
-        }
-        else
-        {
-
-            $resource_stats = array();
-            $link_segments = explode('/', $link);
-
-            /* Detect shared steam resources */
-            if($link_segments[3] == 'sharedfiles')
-                $resource_stats = SteamSharedFiles::get_sharedfiles($link);
-
-            /* Detect steam profiles link */
-            elseif($link_segments[3] == 'id' || $link_segments[3] == 'profiles')
-                $resource_stats = SteamUserInfo::get_user_info_by_url($link);
-
-            /* Detect steam curator */
-            elseif($link_segments[3] == 'curator')
-                $resource_stats = SteamCurator::get_curator_info($link);
-
-            else
-            {
-                $resource_stats['type'] = 'undefined';
-                $resource_stats['link'] = $link;
-            }
-
-            return $resource_stats;
-
-        }
-
-    }
-
+    /*
+     * Filling avatars
+     */
     public function set_items_avatars($array)
     {
 
@@ -431,8 +343,10 @@ class Core extends Config
 
                 if(isset($item['app_id']))
                 {
+
                     foreach($config['app_image_types'] as $size => $part)
                         $array[$id]['avatars'][$size] = 'http://cdn.akamai.steamstatic.com/steam/apps/' . $item['app_id'] . '/' . $part;
+
                 }
 
             }
@@ -443,6 +357,9 @@ class Core extends Config
 
     }
 
+    /*
+     * Filling links
+     */
     public function set_items_links($array)
     {
 
@@ -465,6 +382,90 @@ class Core extends Config
         }
 
         return $array;
+
+    }
+
+    /*
+     * Sending cache to the database
+     */
+    private function cache_search_app_items($array)
+    {
+
+        if(empty($array))
+            return false;
+
+        $generate_where_query = '';
+
+        foreach($array as $item)
+        {
+
+            if(end($array) == $item)
+                $generate_where_query = $generate_where_query . "`app_id` = '" . $item['app_id'] . "'";
+            else
+                $generate_where_query = $generate_where_query . "`app_id` = '" . $item['app_id'] . "' OR ";
+
+        }
+
+        $dirt_result = DB::$conn->query("SELECT `app_id` FROM (`apps_list`) WHERE (" . $generate_where_query . ")");
+
+        $remove_id_list = array();
+        while ($row = $dirt_result->fetch_assoc()) {
+            $remove_id_list[] = $row['app_id'];
+        }
+
+        foreach($array as $k => $v)
+        {
+
+            if(in_array($v['app_id'], $remove_id_list))
+                unset($array[$k]);
+
+        }
+
+        $generate_insert_query = array();
+
+        foreach($array as $item)
+            $generate_insert_query[] = "('" . $item['app_id'] .  "', '" . mysql_real_escape_string($item['name']) . "')";
+
+        $insert_values_string = implode(', ', $generate_insert_query);
+
+        DB::$conn->query("INSERT INTO `apps_list` (`app_id`, `name`) VALUES " . $insert_values_string . ";");
+
+    }
+
+    /*
+     * Getting search results from Steam
+     */
+    private function get_search_result_from_steam()
+    {
+
+        $config = $this->get_config();
+
+        $UrlContent = new UrlContent();
+        $HtmlProcessing = new HtmlProcessing();
+
+        $url = 'http://store.steampowered.com/search/suggest?term=' . urlencode($_GET['term']) . '&f=games&cc=' . mb_strtoupper($config['language_header_components'][$_GET['language']]['header']) . '&l=' . $config['language_header_components'][$_GET['language']]['cookie'];
+        $steam_html = $UrlContent->try_get_url_content($url);
+
+        return $HtmlProcessing->detect_search_result_in_html($steam_html);
+
+    }
+
+    /*
+     * Get reviews from steam
+     */
+    private function get_reviews_from_steam()
+    {
+
+        $UrlContent = new UrlContent();
+        $HtmlProcessing = new HtmlProcessing();
+
+        $url = 'http://store.steampowered.com/appreviews/' . $_GET['app'] . '?start_offset=' . $_GET['offset'] . '&day_range=' . $_GET['day_range'] . '&filter=' . $_GET['filter'] . '&language=' . $_GET['language'];
+        $steam_json = json_decode($UrlContent->try_get_url_content($url));
+
+        if($steam_json->success !== 1)
+            die('App not found');
+
+        return $HtmlProcessing->detect_reviews_in_html($steam_json->html);
 
     }
 
@@ -504,7 +505,7 @@ class YouTubeInfo extends Core
             $link);
 
 
-        $try_cache = $this->mysql_connect->query("SELECT `items` FROM (`youtube_cache`) WHERE `link` = '" . $video_ID . "'");
+        $try_cache = DB::$conn->query("SELECT `items` FROM (`youtube_cache`) WHERE `link` = '" . $video_ID . "'");
 
         if(mysqli_num_rows($try_cache) == 0)
         {
@@ -529,7 +530,7 @@ class YouTubeInfo extends Core
                 //$resource_stats['description'] = $JSON_Data->{'entry'}->{'media$group'}->{'media$description'}->{'$t'};
                 $resource_stats['time'] = gmdate("H:i:s", (int)$JSON_Data->{'entry'}->{'media$group'}->{'media$content'}[0]->duration);
 
-                $this->mysql_connect->query("INSERT INTO `youtube_cache` (`link`, `items`, `datetime`) VALUES ('" . $video_ID . "', '" . base64_encode(serialize($resource_stats)) . "', '" . date('Y-m-d H:i:s') . "');");
+                DB::$conn->query("INSERT INTO `youtube_cache` (`link`, `items`, `datetime`) VALUES ('" . $video_ID . "', '" . base64_encode(serialize($resource_stats)) . "', '" . date('Y-m-d H:i:s') . "');");
 
             }
 
@@ -580,7 +581,7 @@ class SteamUserInfo extends Core
         $resource_stats['type'] = 'steam_profile';
         $resource_stats['link'] = $link;
 
-        $try_cache = $this->mysql_connect->query("SELECT `link`, `profile_id`, `profile_name`, `real_name`, `avatar`, `lang`, `filled` FROM (`users_cache`) WHERE `link` = '" . $link . "'");
+        $try_cache = DB::$conn->query("SELECT `link`, `profile_id`, `profile_name`, `real_name`, `avatar`, `lang`, `filled` FROM (`users_cache`) WHERE `link` = '" . $link . "'");
 
         if($link_segments[3] == 'id')
         {
@@ -589,7 +590,7 @@ class SteamUserInfo extends Core
             $resource_stats['profile_name'] = $link_segments[4];
 
             if(mysqli_num_rows($try_cache) == 0)
-                $this->mysql_connect->query("INSERT INTO `users_cache` (`link`, `profile_name`, `filled`) VALUES ('" . $link. "', '" . $link_segments[4] . "', 0);");
+                DB::$conn->query("INSERT INTO `users_cache` (`link`, `profile_name`, `filled`) VALUES ('" . $link. "', '" . $link_segments[4] . "', 0);");
             else
             {
 
@@ -617,7 +618,7 @@ class SteamUserInfo extends Core
             $resource_stats['profile_name'] = $link_segments[4];
 
             if(mysqli_num_rows($try_cache) == 0)
-                $this->mysql_connect->query("INSERT INTO `users_cache` (`link`, `profile_id`, `filled`) VALUES ('" . $link. "', '" . $link_segments[4] . "', 0);");
+                DB::$conn->query("INSERT INTO `users_cache` (`link`, `profile_id`, `filled`) VALUES ('" . $link. "', '" . $link_segments[4] . "', 0);");
             else
             {
 
@@ -710,30 +711,6 @@ class Render extends Core
 class UrlContent extends Core
 {
 
-    public function get_url_content($get_url)
-    {
-
-        $config = $this->get_config();
-
-        $fake_browser_data = array(
-
-            'http'=>array(
-                'method' => "GET",
-                'User-Agent' => $config['fake_user_agent'],
-                'header' => "Accept-language: " . $config['language_header_components'][$_GET['language']]['header'] . "\r\n" .
-                    "Cookie: Steam_Language=" . $config['language_header_components'][$_GET['language']]['cookie'] . "\r\n"
-            )
-
-        );
-
-        $context = stream_context_create($fake_browser_data);
-        $uconfig = @fopen($get_url, 'r', false, $context);
-        $steam_html = @stream_get_contents($uconfig);
-
-        return $steam_html;
-
-    }
-
     public function try_get_url_content($url, $try_count = false)
     {
 
@@ -760,6 +737,30 @@ class UrlContent extends Core
 
     }
 
+    private function get_url_content($get_url)
+    {
+
+        $config = $this->get_config();
+
+        $fake_browser_data = array(
+
+            'http'=>array(
+                'method' => "GET",
+                'User-Agent' => $config['fake_user_agent'],
+                'header' => "Accept-language: " . $config['language_header_components'][$_GET['language']]['header'] . "\r\n" .
+                    "Cookie: Steam_Language=" . $config['language_header_components'][$_GET['language']]['cookie'] . "\r\n"
+            )
+
+        );
+
+        $context = stream_context_create($fake_browser_data);
+        $uconfig = @fopen($get_url, 'r', false, $context);
+        $steam_html = @stream_get_contents($uconfig);
+
+        return $steam_html;
+
+    }
+
 }
 
 class SteamSharedFiles extends Core
@@ -780,14 +781,14 @@ class SteamSharedFiles extends Core
 
         $file_id = $detect_file_id[1];
 
-        $try_cache = $this->mysql_connect->query("SELECT `id`, `file_type`, `direct_url`, `title`, `filled` FROM (`shared_files_cache`) WHERE `id` = '" . $file_id . "'");
+        $try_cache = DB::$conn->query("SELECT `id`, `file_type`, `direct_url`, `title`, `filled` FROM (`shared_files_cache`) WHERE `id` = '" . $file_id . "'");
 
         /* if new resource */
         if(mysqli_num_rows($try_cache) == 0)
         {
 
             /* get url steam_file content */
-            $resource = SteamSharedFiles::detect_steam_file($link);
+            $resource = $this->detect_steam_file($link);
 
             if(!empty($resource))
             {
@@ -803,14 +804,14 @@ class SteamSharedFiles extends Core
                     $second_part[] = $value;
                 }
 
-                $this->mysql_connect->query("INSERT INTO `shared_files_cache` (`" . implode('`, `', $first_part) . "`) VALUES ('" . implode("', '", $second_part) . "');");
+                DB::$conn->query("INSERT INTO `shared_files_cache` (`" . implode('`, `', $first_part) . "`) VALUES ('" . implode("', '", $second_part) . "');");
 
                 unset($resource_stats['filled']);
 
             }
             else
                 /* if impossible detect resource, set empty value */
-                $this->mysql_connect->query("INSERT INTO `shared_files_cache` (`id`, `filled`) VALUES ('" . $file_id . "', 0);");
+                DB::$conn->query("INSERT INTO `shared_files_cache` (`id`, `filled`) VALUES ('" . $file_id . "', 0);");
 
 
         }
@@ -896,7 +897,6 @@ class HtmlProcessing extends Core
     public function detect_reviews_in_html($html)
     {
 
-        $HtmlProcessing = new HtmlProcessing();
         $config = $this->get_config();
 
         $reviews_explode = explode('<div class="review_box">', $html);
@@ -984,7 +984,7 @@ class HtmlProcessing extends Core
             );
 
             foreach($replaces_tag_array as $conf)
-                $dirty_text = $HtmlProcessing->str_replace_tags($conf, $dirty_text);
+                $dirty_text = $this->str_replace_tags($conf, $dirty_text);
 
             $dirty_text = str_replace('<li>', "[li]", $dirty_text);
             $dirty_text = str_replace('</li>', "[/li]", $dirty_text);
@@ -1014,24 +1014,24 @@ class HtmlProcessing extends Core
                 $resources_array = explode('<a class="bb_link" ', $dirty_text);
                 unset($resources_array[0]);
 
-                foreach($resources_array as $key => $item)
+                foreach($resources_array as $key => $resource)
                 {
 
                     /* Check to isset link */
-                    $detect_link = substr_count($item, 'target="_blank"');
+                    $detect_link = substr_count($resource, 'target="_blank"');
 
                     if($detect_link == 1)
                     {
 
                         /* Detect dynamiclink */
-                        $detect_dynamic = substr_count($item, 'id="dynamiclink_');
+                        $detect_dynamic = substr_count($resource, 'id="dynamiclink_');
 
                         if($detect_dynamic == 1)
                         {
 
                             /* dynamiclink */
-                            $dynamiclink_value = get_string_between($item, '  id="dynamiclink_', '">');
-                            $detect_link = get_string_between($item, 'target="_blank" href="', '"  id="dynamiclink_' . $dynamiclink_value);
+                            $dynamiclink_value = get_string_between($resource, '  id="dynamiclink_', '">');
+                            $detect_link = get_string_between($resource, 'target="_blank" href="', '"  id="dynamiclink_' . $dynamiclink_value);
 
                             /* detect resource */
                             $new_item['resources']['resource_' . $resource_counter] = $this->detect_resource($detect_link);
@@ -1047,7 +1047,7 @@ class HtmlProcessing extends Core
                         {
 
                             /* other link */
-                            $detect_link = get_string_between($item, 'target="_blank" href="', '" >');
+                            $detect_link = get_string_between($resource, 'target="_blank" href="', '" >');
 
                             /* detect resource */
                             $new_item['resources']['resource_' . $resource_counter] = $this->detect_resource($detect_link);
@@ -1124,9 +1124,58 @@ class HtmlProcessing extends Core
     }
 
     /*
+     * Identification of type of resource links
+     */
+    private function detect_resource($link)
+    {
+
+        if(substr_count($link, 'youtube') > 0)
+        {
+
+            $YouTubeInfo = new YouTubeInfo();
+
+            $resource_stats = $YouTubeInfo->get_youtube_info($link);
+            return $resource_stats;
+
+        }
+        else
+        {
+
+            $resource_stats = array();
+            $link_segments = explode('/', $link);
+
+            $SteamSharedFiles = new SteamSharedFiles();
+            $SteamUserInfo = new SteamUserInfo();
+            $SteamCurator = new SteamCurator();
+
+            /* Detect shared steam resources */
+            if($link_segments[3] == 'sharedfiles')
+                $resource_stats = $SteamSharedFiles->get_sharedfiles($link);
+
+            /* Detect steam profiles link */
+            elseif($link_segments[3] == 'id' || $link_segments[3] == 'profiles')
+                $resource_stats = $SteamUserInfo->get_user_info_by_url($link);
+
+            /* Detect steam curator */
+            elseif($link_segments[3] == 'curator')
+                $resource_stats = $SteamCurator->get_curator_info($link);
+
+            else
+            {
+                $resource_stats['type'] = 'undefined';
+                $resource_stats['link'] = $link;
+            }
+
+            return $resource_stats;
+
+        }
+
+    }
+
+    /*
      * Finding and replacing tags, excluding other tags in text
      */
-    public function str_replace_tags($conf, $text)
+    private function str_replace_tags($conf, $text)
     {
 
         /* Tags management script */
@@ -1243,7 +1292,7 @@ class HtmlProcessing extends Core
     /*
      * The search function tags in the text, and transform them into an array
      */
-    public function convert_text_to_tags_array($tag, $text, $collected_tags = array(), $counter = 1)
+    private function convert_text_to_tags_array($tag, $text, $collected_tags = array(), $counter = 1)
     {
 
         /* Detect tags value */
