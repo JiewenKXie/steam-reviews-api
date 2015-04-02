@@ -20,6 +20,9 @@ class Config
             'db_pass' => '',
             'db_database' => 'project',
 
+            /* Collect cash, or not */
+            'save_cache' => true,
+
             /* Restrictions requests */
             'count_request_limit' => 30,
             'request_limit_time_in_minutes' => '1 minutes',

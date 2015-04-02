@@ -104,7 +104,7 @@ class Core extends Config
         $result = $dirt_result->fetch_assoc();
 
         //if not found
-        if($result == false)
+        if($result == false && $config['save_cache'] == true)
             DB::$conn->query("INSERT INTO `request_limit` (`ip`, `count`, `datetime`) VALUES ('" . $ip . "', 1, '" . date('Y-m-d H:i:s') . "')");
 
         //if it exists, but expired
@@ -112,7 +112,9 @@ class Core extends Config
         {
 
             DB::$conn->query("DELETE FROM `request_limit` WHERE `ip` = '" . $ip . "'");
-            DB::$conn->query("INSERT INTO `request_limit` (`ip`, `count`, `datetime`) VALUES ('" . $ip . "', 1, '" . date('Y-m-d H:i:s') . "')");
+
+            if($config['save_cache'] == true)
+                DB::$conn->query("INSERT INTO `request_limit` (`ip`, `count`, `datetime`) VALUES ('" . $ip . "', 1, '" . date('Y-m-d H:i:s') . "')");
 
         }
 
@@ -181,7 +183,8 @@ class Core extends Config
                 $serialize_items = base64_encode(serialize($items));
                 $safe_serialize_items = mysql_real_escape_string($serialize_items);
 
-                DB::$conn->query("INSERT INTO `reviews_cache` (`app`, `offset`, `filter`, `language`, `datetime`, `items`, `day_range`) VALUES ('" . $_GET['app'] . "', '" . $_GET['offset'] . "', '" . $_GET['filter'] . "', '" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $safe_serialize_items . "', '" . $_GET['day_range'] . "')");
+                if($config['save_cache'] == true)
+                    DB::$conn->query("INSERT INTO `reviews_cache` (`app`, `offset`, `filter`, `language`, `datetime`, `items`, `day_range`) VALUES ('" . $_GET['app'] . "', '" . $_GET['offset'] . "', '" . $_GET['filter'] . "', '" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $safe_serialize_items . "', '" . $_GET['day_range'] . "')");
             }
 
             return $items;
@@ -200,7 +203,9 @@ class Core extends Config
                 $safe_serialize_items = mysql_real_escape_string($serialize_items);
 
                 DB::$conn->query("DELETE FROM `reviews_cache` WHERE `app` = '" . $_GET['app'] . "' AND `offset` = '" . $_GET['offset'] . "' AND `filter` = '" . $_GET['filter'] . "' AND `day_range` = '" . $_GET['day_range'] . "' AND `language` = '" . $_GET['language'] . "'");
-                DB::$conn->query("INSERT INTO `reviews_cache` (`app`, `offset`, `filter`, `language`, `datetime`, `items`, `day_range`) VALUES ('" . $_GET['app'] . "', '" . $_GET['offset'] . "', '" . $_GET['filter'] . "', '" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $safe_serialize_items . "', '" . $_GET['day_range'] . "')");
+
+                if($config['save_cache'] == true)
+                    DB::$conn->query("INSERT INTO `reviews_cache` (`app`, `offset`, `filter`, `language`, `datetime`, `items`, `day_range`) VALUES ('" . $_GET['app'] . "', '" . $_GET['offset'] . "', '" . $_GET['filter'] . "', '" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $safe_serialize_items . "', '" . $_GET['day_range'] . "')");
             }
             return $items;
 
@@ -291,7 +296,8 @@ class Core extends Config
                 $serialize_items = base64_encode(serialize($items));
                 $safe_serialize_items = mysql_real_escape_string($serialize_items);
 
-                DB::$conn->query("INSERT INTO `search_cache` (`language`, `datetime`, `search`, `items`) VALUES ('" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $_GET['term'] . "', '" . $safe_serialize_items . "')");
+                if($config['save_cache'] == true)
+                    DB::$conn->query("INSERT INTO `search_cache` (`language`, `datetime`, `search`, `items`) VALUES ('" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $_GET['term'] . "', '" . $safe_serialize_items . "')");
             }
             return $items;
 
@@ -310,7 +316,9 @@ class Core extends Config
                 $safe_serialize_items = mysql_real_escape_string($serialize_items);
 
                 DB::$conn->query("DELETE FROM `search_cache` WHERE `language` = '" . $_GET['language'] . "' AND `search` = '" . $_GET['term'] . "'");
-                DB::$conn->query("INSERT INTO `search_cache` (`language`, `datetime`, `search`, `items`) VALUES ('" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $_GET['term'] . "', '" . $safe_serialize_items . "')");
+
+                if($config['save_cache'] == true)
+                    DB::$conn->query("INSERT INTO `search_cache` (`language`, `datetime`, `search`, `items`) VALUES ('" . $_GET['language'] . "', '" . date('Y-m-d H:i:s') . "', '" . $_GET['term'] . "', '" . $safe_serialize_items . "')");
             }
             return $items;
 
@@ -392,6 +400,7 @@ class Core extends Config
      */
     private function cache_search_app_items($array)
     {
+        $config = $this->get_config();
 
         if(empty($array))
             return false;
@@ -430,7 +439,8 @@ class Core extends Config
 
         $insert_values_string = implode(', ', $generate_insert_query);
 
-        DB::$conn->query("INSERT INTO `apps_list` (`app_id`, `name`) VALUES " . $insert_values_string . ";");
+        if($config['save_cache'] == true)
+            DB::$conn->query("INSERT INTO `apps_list` (`app_id`, `name`) VALUES " . $insert_values_string . ";");
 
     }
 
@@ -478,6 +488,7 @@ class YouTubeInfo extends Core
 
     public function get_youtube_info($link)
     {
+        $config = $this->get_config();
 
         $resource_stats = array('type' => 'youtube', 'link' => $link);
 
@@ -504,7 +515,8 @@ class YouTubeInfo extends Core
                 //$resource_stats['description'] = $JSON_Data->{'entry'}->{'media$group'}->{'media$description'}->{'$t'};
                 $resource_stats['time'] = gmdate("H:i:s", (int)$JSON_Data->{'entry'}->{'media$group'}->{'media$content'}[0]->duration);
 
-                DB::$conn->query("INSERT INTO `youtube_cache` (`link`, `items`, `datetime`) VALUES ('" . $video_id . "', '" . base64_encode(serialize($resource_stats)) . "', '" . date('Y-m-d H:i:s') . "');");
+                if($config['save_cache'] == true)
+                    DB::$conn->query("INSERT INTO `youtube_cache` (`link`, `items`, `datetime`) VALUES ('" . $video_id . "', '" . base64_encode(serialize($resource_stats)) . "', '" . date('Y-m-d H:i:s') . "');");
 
             }
 
@@ -610,7 +622,7 @@ class SteamUserInfo extends Core
 
     public function get_user_info_by_url($link)
     {
-
+        $config = $this->get_config();
         $resource_stats = array();
 
         $link_segments = explode('/', $link);
@@ -626,7 +638,7 @@ class SteamUserInfo extends Core
             $resource_stats['title_type'] = 'profile_name';
             $resource_stats['profile_name'] = $link_segments[4];
 
-            if(mysqli_num_rows($try_cache) == 0)
+            if(mysqli_num_rows($try_cache) == 0 && $config['save_cache'] == true)
                 DB::$conn->query("INSERT INTO `users_cache` (`link`, `profile_name`, `filled`) VALUES ('" . $link. "', '" . $link_segments[4] . "', 0);");
             else
             {
@@ -654,7 +666,7 @@ class SteamUserInfo extends Core
             $resource_stats['title_type'] = 'profile_id';
             $resource_stats['profile_name'] = $link_segments[4];
 
-            if(mysqli_num_rows($try_cache) == 0)
+            if(mysqli_num_rows($try_cache) == 0 && $config['save_cache'] == true)
                 DB::$conn->query("INSERT INTO `users_cache` (`link`, `profile_id`, `filled`) VALUES ('" . $link. "', '" . $link_segments[4] . "', 0);");
             else
             {
@@ -806,6 +818,8 @@ class SteamSharedFiles extends Core
     public function get_sharedfiles($link)
     {
 
+        $config = $this->get_config();
+
         $resource_stats = array(
             'type' => 'steam_file',
             'link' => $link
@@ -843,15 +857,20 @@ class SteamSharedFiles extends Core
                     $second_part[] = $value;
                 }
 
-                DB::$conn->query("INSERT INTO `shared_files_cache` (`" . implode('`, `', $first_part) . "`) VALUES ('" . implode("', '", $second_part) . "');");
+                if($config['save_cache'] == true)
+                    DB::$conn->query("INSERT INTO `shared_files_cache` (`" . implode('`, `', $first_part) . "`) VALUES ('" . implode("', '", $second_part) . "');");
 
                 unset($resource_stats['filled']);
 
             }
             else
-                /* if impossible detect resource, set empty value */
-                DB::$conn->query("INSERT INTO `shared_files_cache` (`id`, `filled`) VALUES ('" . $file_id . "', 0);");
+            {
 
+                /* if impossible detect resource, set empty value */
+                if($config['save_cache'] == true)
+                    DB::$conn->query("INSERT INTO `shared_files_cache` (`id`, `filled`) VALUES ('" . $file_id . "', 0);");
+
+            }
 
         }
         else
@@ -967,6 +986,15 @@ class HtmlProcessing extends Core
 
             $replaces_tag_array = array(
 
+                /* Remove empty spans */
+                'span' => array(
+                    'start_what' => '<span>',
+                    'start_than' => '',
+                    'finish_what' => '</span>',
+                    'finish_than' => '',
+                    'tag_name' => 'span'
+                ),
+
                 'h1' => array(
                     'start_what' => '<div class="bb_h1">',
                     'start_than' => '[h1]',
@@ -990,15 +1018,6 @@ class HtmlProcessing extends Core
                     'start_than' => '[s]',
                     'finish_what' => '</span>',
                     'finish_than' => '[/s]',
-                    'tag_name' => 'span'
-                ),
-
-                /* Remove empty spans */
-                'span' => array(
-                    'start_what' => '<span>',
-                    'start_than' => '',
-                    'finish_what' => '</span>',
-                    'finish_than' => '',
                     'tag_name' => 'span'
                 ),
 
