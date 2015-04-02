@@ -585,6 +585,35 @@ class SteamCurator extends Core
 
 }
 
+class SteamDiscussions extends Core
+{
+
+    public function get_discussions_link($link)
+    {
+
+        $resource_stats = array();
+
+        $exploded_link = explode('/', $link);
+
+        $resource_stats['type'] = 'discussions link';
+        $resource_stats['link'] = $link;
+
+        if(isset($exploded_link[4]))
+            $resource_stats['app_id'] = $exploded_link[4];
+
+        if(isset($exploded_link[7]))
+            $resource_stats['discussion_id'] = $exploded_link[7];
+
+        if(isset($exploded_link[8]))
+            $resource_stats['navigate_to_id'] = str_replace('#', '', $exploded_link[8]);
+
+        return $resource_stats;
+
+    }
+
+}
+
+
 class SteamExternalLink extends Core
 {
 
@@ -1212,6 +1241,7 @@ class HtmlProcessing extends Core
             $SteamUserInfo = new SteamUserInfo();
             $SteamCurator = new SteamCurator();
             $SteamExternalLink = new SteamExternalLink();
+            $SteamDiscussions = new SteamDiscussions();
 
             /* Detect shared steam resources */
             if($link_segments[3] == 'sharedfiles')
@@ -1227,6 +1257,9 @@ class HtmlProcessing extends Core
 
             elseif($link_segments[3] == 'linkfilter')
                 $resource_stats = $SteamExternalLink->get_direct_link($link);
+
+            elseif($link_segments[5] == 'discussions')
+                $resource_stats = $SteamDiscussions->get_discussions_link($link);
 
             else
             {

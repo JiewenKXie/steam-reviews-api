@@ -31,7 +31,7 @@ class Config
             'retrying_get_content' => 3,
 
             /* Parser user agent */
-            'fake_user_agent' => 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/40.0.2214.115 Safari/537.36',
+            'fake_user_agent' => 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36',
 
             /* Available API languages */
             'languages' => array('russian', 'english', 'polish'),
